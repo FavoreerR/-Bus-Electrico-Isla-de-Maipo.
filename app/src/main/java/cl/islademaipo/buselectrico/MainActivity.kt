@@ -9,6 +9,8 @@ import android.widget.*
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.android.gms.location.LocationServices
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -31,6 +33,7 @@ class MainActivity : ComponentActivity() {
   Configuration.getInstance().userAgentValue = packageName
   val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
   val heading = TextView(this).apply { text = "🚌 Bus Eléctrico Isla de Maipo"; textSize = 21f; setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(198,40,40)); setPadding(22,28,12,28); gravity = Gravity.CENTER_VERTICAL }
+  applySafeInsets(root)
   rootLayout = root
   root.addView(heading)
   status = TextView(this).apply { text = "Mapa Santiago ↔ Isla de Maipo. Ubicaciones de buses aún no conectadas."; textSize = 14f; setTextColor(Color.DKGRAY); setPadding(18,18,18,18) }
@@ -46,11 +49,13 @@ class MainActivity : ComponentActivity() {
   val share = Button(this).apply { text = "🔒 Compartir GPS (próximamente)"; isEnabled = false }
   val chat = Button(this).apply { text = "💬 Chat comunitario"; setOnClickListener { showChat() } }
   buttons.addView(locate); buttons.addView(report); buttons.addView(share); buttons.addView(chat)
-  root.addView(buttons)
+  val buttonScroll = ScrollView(this).apply { isFillViewport = false; addView(buttons) }
+  root.addView(buttonScroll, LinearLayout.LayoutParams(-1, (220 * resources.displayMetrics.density).toInt()))
   setContentView(root)
  }
  private fun showChat() {
   val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(16,12,16,12) }
+  applySafeInsets(panel)
   val title = TextView(this).apply { text = "💬 Chat de pasajeros"; textSize = 23f; setTextColor(Color.rgb(198,40,40)) }
   val notice = TextView(this).apply { text = "Modo de prueba: los mensajes solo se guardan en este teléfono mientras la app está abierta. El chat público necesita un servidor y medidas de moderación. No compartas datos personales ni ubicaciones exactas."; textSize = 13f; setTextColor(Color.DKGRAY); setPadding(0,10,0,10) }
   val messages = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -69,6 +74,13 @@ class MainActivity : ComponentActivity() {
   panel.addView(title); panel.addView(notice); panel.addView(scroll, LinearLayout.LayoutParams(-1,0,1f)); panel.addView(entry); panel.addView(send); panel.addView(back)
   redraw()
   setContentView(panel)
+ }
+ private fun applySafeInsets(view: android.view.View) {
+  ViewCompat.setOnApplyWindowInsetsListener(view) { v, insets ->
+   val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+   v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+   insets
+  }
  }
  private fun addPlace(name:String,lat:Double,lon:Double) { Marker(map).apply { position=GeoPoint(lat,lon); title=name; setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM); map.overlays.add(this) } }
  private fun askLocation() { if (ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED) showMyLocation() else requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION)) }
