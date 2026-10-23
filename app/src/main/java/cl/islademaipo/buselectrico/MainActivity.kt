@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
  private lateinit var status: TextView
  private lateinit var rootLayout: LinearLayout
  private val localMessages = mutableListOf<String>()
+ private val sightings = mutableListOf<Pair<GeoPoint, Long>>()
  private var myMarker: Marker? = null
  private val locationClient by lazy { LocationServices.getFusedLocationProviderClient(this) }
  private val requestLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { perms ->
@@ -45,13 +46,47 @@ class MainActivity : ComponentActivity() {
   addPlace("Isla de Maipo",-33.7535,-70.8993)
   val buttons = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(14,10,14,14) }
   val locate = Button(this).apply { text = "📍 Ver mi ubicación"; setOnClickListener { askLocation() } }
-  val report = Button(this).apply { text = "🚌 Reportar avistamiento del bus"; setOnClickListener { status.text = "Los reportes públicos requieren un servidor seguro y moderación. Función pendiente de conexión."; Toast.makeText(this@MainActivity,"Aún no disponible: no se enviaron datos",Toast.LENGTH_LONG).show() } }
+  val report = Button(this).apply { text = "🚌 Reportar avistamiento del bus"; setOnClickListener { reportSighting() } }
   val share = Button(this).apply { text = "🔒 Compartir GPS (próximamente)"; isEnabled = false }
   val chat = Button(this).apply { text = "💬 Chat comunitario"; setOnClickListener { showChat() } }
   buttons.addView(locate); buttons.addView(report); buttons.addView(share); buttons.addView(chat)
   val buttonScroll = ScrollView(this).apply { isFillViewport = false; addView(buttons) }
   root.addView(buttonScroll, LinearLayout.LayoutParams(-1, (220 * resources.displayMetrics.density).toInt()))
   setContentView(root)
+ }
+ private fun reportSighting() {
+  val options = arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")
+  android.app.AlertDialog.Builder(this)
+   .setTitle("Reportar avistamiento")
+   .setMessage("Se marcará un avistamiento de prueba en tu ubicación aproximada. Solo se guardará en este teléfono; otros pasajeros todavía no podrán verlo.")
+   .setItems(options) { _, selected ->
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+     status.text = "Para reportar, primero permite la ubicación desde Ver mi ubicación."
+     askLocation()
+    } else {
+     locationClient.lastLocation.addOnSuccessListener { loc ->
+      if (loc == null || System.currentTimeMillis() - loc.time > 120000L) {
+       status.text = "No hay ubicación reciente. Activa el GPS e inténtalo nuevamente."
+      } else {
+       val point = GeoPoint(Math.round(loc.latitude * 1000.0) / 1000.0, Math.round(loc.longitude * 1000.0) / 1000.0)
+       sightings.add(point to System.currentTimeMillis())
+       Marker(map).apply {
+        position = point
+        title = "Avistamiento de prueba: " + options[selected]
+        snippet = "Solo visible en este teléfono; no confirmado"
+        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        map.overlays.add(this)
+       }
+       map.controller.setCenter(point)
+       map.controller.setZoom(14.0)
+       map.invalidate()
+       status.text = "Avistamiento de prueba registrado en este teléfono. No se publicó en internet."
+       Toast.makeText(this, "Reporte local guardado", Toast.LENGTH_SHORT).show()
+      }
+     }.addOnFailureListener { status.text = "No se pudo consultar la ubicación." }
+    }
+   }.setNegativeButton("Cancelar", null).show()
  }
  private fun showChat() {
   val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(16,12,16,12) }
