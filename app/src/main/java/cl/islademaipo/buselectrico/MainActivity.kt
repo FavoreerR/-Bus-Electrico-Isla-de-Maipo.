@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
  private val localMessages = mutableListOf<String>()
  private val chatPrefs by lazy { getSharedPreferences("passenger_chat_local", MODE_PRIVATE) }
  private val sightings = mutableListOf<Pair<GeoPoint, Long>>()
+ private val reportPrefs by lazy { getSharedPreferences("sighting_reports", MODE_PRIVATE) }
  private var myMarker: Marker? = null
  private val locationClient by lazy { LocationServices.getFusedLocationProviderClient(this) }
  private val requestLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { perms ->
@@ -51,6 +52,7 @@ class MainActivity : ComponentActivity() {
   addPlace("Santiago",-33.4489,-70.6693)
   addPlace("Talagante",-33.6639,-70.9275)
   addPlace("Isla de Maipo",-33.7535,-70.8993)
+  restoreSightings()
   val buttons = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(14,10,14,14) }
   val locate = Button(this).apply { text = "📍 Ver mi ubicación"; setOnClickListener { askLocation() } }
   val report = Button(this).apply { text = "🚌 Reportar avistamiento del bus"; setOnClickListener { reportSighting() } }
@@ -65,37 +67,68 @@ class MainActivity : ComponentActivity() {
  private fun reportSighting() {
   val options = arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")
   android.app.AlertDialog.Builder(this)
-   .setTitle("Reportar avistamiento")
-   .setMessage("Se marcará un avistamiento de prueba en tu ubicación aproximada. Solo se guardará en este teléfono; otros pasajeros todavía no podrán verlo.")
+   .setTitle("Reportar avistamiento del bus")
+   .setMessage("Tu reporte será aproximado y solo visible en este teléfono por ahora. No representa seguimiento GPS oficial. ¿Qué observaste?")
    .setItems(options) { _, selected ->
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-     status.text = "Para reportar, primero permite la ubicación desde Ver mi ubicación."
+     status.text = "Permite la ubicación para registrar el avistamiento y vuelve a intentarlo."
      askLocation()
     } else {
-     locationClient.lastLocation.addOnSuccessListener { loc ->
-      if (loc == null || System.currentTimeMillis() - loc.time > 120000L) {
-       status.text = "No hay ubicación reciente. Activa el GPS e inténtalo nuevamente."
-      } else {
-       val point = GeoPoint(Math.round(loc.latitude * 1000.0) / 1000.0, Math.round(loc.longitude * 1000.0) / 1000.0)
-       sightings.add(point to System.currentTimeMillis())
-       Marker(map).apply {
-        position = point
-        icon = busMarkerIcon()
-        title = "🚌 Avistamiento de prueba: " + options[selected]
-        snippet = "Solo visible en este teléfono; no confirmado"
-        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-        map.overlays.add(this)
+     status.text = "Buscando tu ubicación actual para el reporte..."
+     val token = com.google.android.gms.tasks.CancellationTokenSource()
+     locationClient.getCurrentLocation(com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY, token.token)
+      .addOnSuccessListener { loc ->
+       if (loc == null || System.currentTimeMillis() - loc.time > 120000L) {
+        status.text = "No se obtuvo una ubicación reciente. Activa el GPS e inténtalo de nuevo."
+       } else {
+        val latitude = Math.round(loc.latitude * 1000.0) / 1000.0
+        val longitude = Math.round(loc.longitude * 1000.0) / 1000.0
+        val time = System.currentTimeMillis()
+        val point = GeoPoint(latitude, longitude)
+        val existing = reportPrefs.getString("reports", "") ?: ""
+        val row = "$latitude,$longitude,$time,$selected"
+        reportPrefs.edit().putString("reports", (existing.split("|").filter { it.isNotBlank() }.takeLast(49) + row).joinToString("|")).apply()
+        addSightingMarker(point, time, options[selected])
+        map.controller.setCenter(point)
+        map.controller.setZoom(14.0)
+        map.invalidate()
+        status.text = "Avistamiento registrado en este teléfono. No está publicado para otros pasajeros."
+        Toast.makeText(this, "Avistamiento guardado", Toast.LENGTH_LONG).show()
        }
-       map.controller.setCenter(point)
-       map.controller.setZoom(14.0)
-       map.invalidate()
-       status.text = "Avistamiento de prueba registrado en este teléfono. No se publicó en internet."
-       Toast.makeText(this, "Reporte local guardado", Toast.LENGTH_SHORT).show()
-      }
-     }.addOnFailureListener { status.text = "No se pudo consultar la ubicación." }
+      }.addOnFailureListener { status.text = "No se pudo consultar el GPS. Inténtalo nuevamente." }
     }
    }.setNegativeButton("Cancelar", null).show()
+ }
+ private fun addSightingMarker(point: GeoPoint, time: Long, description: String) {
+  sightings.add(point to time)
+  val clock = java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale("es", "CL")).format(java.util.Date(time))
+  Marker(map).apply {
+   position = point
+   icon = busMarkerIcon()
+   title = "🚌 Reporte de pasajero: $description"
+   snippet = "$clock · Ubicación aproximada · No confirmado · Solo este teléfono"
+   setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+   map.overlays.add(this)
+  }
+ }
+ private fun restoreSightings() {
+  val raw = reportPrefs.getString("reports", "") ?: ""
+  val now = System.currentTimeMillis()
+  raw.split("|").filter { it.isNotBlank() }.forEach { row ->
+   val parts = row.split(",")
+   if (parts.size == 4) {
+    val lat = parts[0].toDoubleOrNull()
+    val lon = parts[1].toDoubleOrNull()
+    val time = parts[2].toLongOrNull()
+    val option = parts[3].toIntOrNull()
+    if (lat != null && lon != null && time != null && option != null &&
+        lat in -90.0..90.0 && lon in -180.0..180.0 &&
+        time <= now && now - time < 2 * 60 * 60 * 1000L && option in 0..2) {
+     addSightingMarker(GeoPoint(lat, lon), time, arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")[option])
+    }
+   }
+  }
  }
  private fun askPassengerName(afterSave: () -> Unit = {}) {
   val field = EditText(this).apply {
