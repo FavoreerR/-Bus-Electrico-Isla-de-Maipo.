@@ -138,7 +138,7 @@ class MainActivity : ComponentActivity() {
   val clear = Button(this).apply {
    text = "Borrar mensajes de este teléfono"
    setOnClickListener {
-    android.app.AlertDialog.Builder(this).setTitle("Borrar chat local")
+    android.app.AlertDialog.Builder(this@MainActivity).setTitle("Borrar chat local")
      .setMessage("¿Eliminar los avisos guardados en este teléfono?")
      .setPositiveButton("Borrar") { _, _ -> localMessages.clear(); chatPrefs.edit().remove("messages").apply(); redraw() }
      .setNegativeButton("Cancelar", null).show()
