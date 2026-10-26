@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
  private lateinit var status: TextView
  private lateinit var rootLayout: LinearLayout
  private val localMessages = mutableListOf<String>()
+ private val chatPrefs by lazy { getSharedPreferences("passenger_chat_local", MODE_PRIVATE) }
  private val sightings = mutableListOf<Pair<GeoPoint, Long>>()
  private var myMarker: Marker? = null
  private val locationClient by lazy { LocationServices.getFusedLocationProviderClient(this) }
@@ -32,6 +33,8 @@ class MainActivity : ComponentActivity() {
  override fun onCreate(savedInstanceState: Bundle?) {
   super.onCreate(savedInstanceState)
   Configuration.getInstance().userAgentValue = packageName
+  localMessages.clear()
+  localMessages.addAll(chatPrefs.getString("messages", "")!!.split("§").map { it.replace("⏎", "\\n") }.filter { it.isNotBlank() }.takeLast(100))
   val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
   val heading = TextView(this).apply { text = "🚌 Bus Eléctrico Isla de Maipo"; textSize = 21f; setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(198,40,40)); setPadding(22,28,12,28); gravity = Gravity.CENTER_VERTICAL }
   applySafeInsets(root)
@@ -89,26 +92,64 @@ class MainActivity : ComponentActivity() {
    }.setNegativeButton("Cancelar", null).show()
  }
  private fun showChat() {
-  val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE); setPadding(16,12,16,12) }
+  val red = Color.rgb(198,40,40)
+  val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.rgb(248,248,248)) }
   applySafeInsets(panel)
-  val title = TextView(this).apply { text = "💬 Chat de pasajeros"; textSize = 23f; setTextColor(Color.rgb(198,40,40)) }
-  val notice = TextView(this).apply { text = "Modo de prueba: los mensajes solo se guardan en este teléfono mientras la app está abierta. El chat público necesita un servidor y medidas de moderación. No compartas datos personales ni ubicaciones exactas."; textSize = 13f; setTextColor(Color.DKGRAY); setPadding(0,10,0,10) }
-  val messages = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+  val title = TextView(this).apply {
+   text = "💬 Comunidad del bus eléctrico"; textSize = 20f; setTextColor(Color.WHITE)
+   setBackgroundColor(red); setPadding(20,20,20,20)
+  }
+  val notice = TextView(this).apply {
+   text = "Chat local de prueba · Los mensajes se guardan solo en este teléfono. No los reciben otros pasajeros. Evita compartir datos personales."
+   textSize = 13f; setTextColor(Color.DKGRAY); setPadding(20,14,20,14)
+  }
+  val messages = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(14,8,14,8) }
+  val scroll = ScrollView(this).apply { addView(messages); isFillViewport = true }
   fun redraw() {
    messages.removeAllViews()
-   if(localMessages.isEmpty()) messages.addView(TextView(this).apply { text = "Todavía no hay mensajes en esta prueba."; textSize = 15f })
-   localMessages.forEach { msg -> messages.addView(TextView(this).apply { text = msg; textSize = 16f; setPadding(12,12,12,12) }) }
+   if (localMessages.isEmpty()) messages.addView(TextView(this).apply {
+    text = "Aún no hay avisos guardados. Escribe el primero."; textSize = 15f
+    setTextColor(Color.GRAY); setPadding(12,18,12,18)
+   })
+   localMessages.forEach { msg ->
+    val bubble = TextView(this).apply {
+     text = msg; textSize = 15f; setTextColor(Color.rgb(35,35,35))
+     setBackgroundColor(Color.rgb(235,235,235)); setPadding(16,14,16,14)
+    }
+    messages.addView(bubble, LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = 10 })
+   }
   }
-  val scroll = ScrollView(this).apply { addView(messages) }
-  val entry = EditText(this).apply { hint = "Escribe un aviso del recorrido"; maxLines = 3; filters = arrayOf(android.text.InputFilter.LengthFilter(300)) }
-  val send = Button(this).apply { text = "Enviar (prueba local)"; setOnClickListener {
-   val value = entry.text.toString().trim()
-   if(value.isNotEmpty()) { localMessages.add("Pasajero: $value"); entry.text.clear(); redraw(); scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) } }
-  } }
+  val entry = EditText(this).apply {
+   hint = "Escribe un aviso del recorrido"; maxLines = 3; minLines = 1
+   filters = arrayOf(android.text.InputFilter.LengthFilter(300))
+  }
+  val send = Button(this).apply {
+   text = "Enviar aviso local"; setOnClickListener {
+    val value = entry.text.toString().trim().replace("\\n", " ")
+    if (value.isNotEmpty()) {
+     val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale("es","CL")).format(java.util.Date())
+     localMessages.add("Pasajero · $time\\n$value")
+     while (localMessages.size > 100) localMessages.removeAt(0)
+     chatPrefs.edit().putString("messages", localMessages.joinToString("§") { it.replace("\\n", "⏎") }).apply()
+     entry.text.clear(); redraw(); scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+    }
+   }
+  }
+  val clear = Button(this).apply {
+   text = "Borrar mensajes de este teléfono"
+   setOnClickListener {
+    android.app.AlertDialog.Builder(this).setTitle("Borrar chat local")
+     .setMessage("¿Eliminar los avisos guardados en este teléfono?")
+     .setPositiveButton("Borrar") { _, _ -> localMessages.clear(); chatPrefs.edit().remove("messages").apply(); redraw() }
+     .setNegativeButton("Cancelar", null).show()
+   }
+  }
   val back = Button(this).apply { text = "← Volver al mapa"; setOnClickListener { setContentView(rootLayout) } }
-  panel.addView(title); panel.addView(notice); panel.addView(scroll, LinearLayout.LayoutParams(-1,0,1f)); panel.addView(entry); panel.addView(send); panel.addView(back)
-  redraw()
-  setContentView(panel)
+  val bottom = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12,4,12,8) }
+  bottom.addView(entry); bottom.addView(send); bottom.addView(clear); bottom.addView(back)
+  panel.addView(title); panel.addView(notice)
+  panel.addView(scroll, LinearLayout.LayoutParams(-1,0,1f)); panel.addView(bottom)
+  redraw(); setContentView(panel)
  }
  private fun applySafeInsets(view: android.view.View) {
   ViewCompat.setOnApplyWindowInsetsListener(view) { v, insets ->
