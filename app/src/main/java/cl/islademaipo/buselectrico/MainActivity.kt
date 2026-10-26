@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
   val buttonScroll = ScrollView(this).apply { isFillViewport = false; addView(buttons) }
   root.addView(buttonScroll, LinearLayout.LayoutParams(-1, (220 * resources.displayMetrics.density).toInt()))
   setContentView(root)
+  if (chatPrefs.getString("display_name", "").isNullOrBlank()) { root.post { askPassengerName() } }
  }
  private fun reportSighting() {
   val options = arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")
@@ -91,6 +92,27 @@ class MainActivity : ComponentActivity() {
     }
    }.setNegativeButton("Cancelar", null).show()
  }
+ private fun askPassengerName(afterSave: () -> Unit = {}) {
+  val field = EditText(this).apply {
+   hint = "Tu nombre o apodo"; setSingleLine(true)
+   filters = arrayOf(android.text.InputFilter.LengthFilter(30))
+   setText(chatPrefs.getString("display_name", ""))
+  }
+  val dialog = android.app.AlertDialog.Builder(this)
+   .setTitle("Perfil de pasajero")
+   .setMessage("Elige el nombre que aparecerá en tus avisos. Usa un apodo si prefieres proteger tu privacidad.")
+   .setView(field)
+   .setPositiveButton("Guardar", null)
+   .setNegativeButton("Más tarde", null).create()
+  dialog.setOnShowListener {
+   dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+    val name = field.text.toString().trim().replace(Regex("\\s+"), " ")
+    if (name.length < 2) { field.error = "Escribe al menos 2 caracteres" }
+    else { chatPrefs.edit().putString("display_name", name).apply(); dialog.dismiss(); afterSave() }
+   }
+  }
+  dialog.show()
+ }
  private fun showChat() {
   val red = Color.rgb(198,40,40)
   val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.rgb(248,248,248)) }
@@ -119,6 +141,8 @@ class MainActivity : ComponentActivity() {
     messages.addView(bubble, LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = 10 })
    }
   }
+  val profile = Button(this).apply { text = "👤 Cambiar mi nombre"; setOnClickListener { askPassengerName { text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre" } } }
+  profile.text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre"
   val entry = EditText(this).apply {
    hint = "Escribe un aviso del recorrido"; maxLines = 3; minLines = 1
    filters = arrayOf(android.text.InputFilter.LengthFilter(300))
@@ -128,7 +152,8 @@ class MainActivity : ComponentActivity() {
     val value = entry.text.toString().trim().replace("\\n", " ")
     if (value.isNotEmpty()) {
      val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale("es","CL")).format(java.util.Date())
-     localMessages.add("Pasajero · $time\\n$value")
+     val sender = chatPrefs.getString("display_name", "Pasajero") ?: "Pasajero"
+     localMessages.add("$sender · $time\\n$value")
      while (localMessages.size > 100) localMessages.removeAt(0)
      chatPrefs.edit().putString("messages", localMessages.joinToString("§") { it.replace("\\n", "⏎") }).apply()
      entry.text.clear(); redraw(); scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
@@ -146,7 +171,7 @@ class MainActivity : ComponentActivity() {
   }
   val back = Button(this).apply { text = "← Volver al mapa"; setOnClickListener { setContentView(rootLayout) } }
   val bottom = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12,4,12,8) }
-  bottom.addView(entry); bottom.addView(send); bottom.addView(clear); bottom.addView(back)
+  bottom.addView(profile); bottom.addView(entry); bottom.addView(send); bottom.addView(clear); bottom.addView(back)
   panel.addView(title); panel.addView(notice)
   panel.addView(scroll, LinearLayout.LayoutParams(-1,0,1f)); panel.addView(bottom)
   redraw(); setContentView(panel)
