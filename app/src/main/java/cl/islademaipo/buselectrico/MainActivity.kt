@@ -138,7 +138,8 @@ class MainActivity : ComponentActivity() {
    messages.setBackgroundColor(themeBackgrounds[selectedTheme])
   }
   applyTheme()
-  var redrawThemeMessages: () -> Unit = {}\n  val themes = Button(this).apply {
+  var redrawThemeMessages: () -> Unit = {}
+  val themes = Button(this).apply {
    text = "🎨 Fondo del chat: " + themeNames[selectedTheme]
    setOnClickListener {
     android.app.AlertDialog.Builder(this@MainActivity)
@@ -154,7 +155,8 @@ class MainActivity : ComponentActivity() {
    }
   }
   fun redraw() {
-   messages.removeAllViews()\n   applyTheme()
+   messages.removeAllViews()
+   applyTheme()
    if (localMessages.isEmpty()) messages.addView(TextView(this).apply {
     text = "Aún no hay avisos guardados. Escribe el primero."; textSize = 15f
     setTextColor(if (selectedTheme == 1) Color.WHITE else Color.GRAY); setPadding(12,18,12,18)
@@ -167,7 +169,8 @@ class MainActivity : ComponentActivity() {
     messages.addView(bubble, LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = 10 })
    }
   }
-  redrawThemeMessages = { redraw() }\n  val profile = Button(this).apply { text = "👤 Cambiar mi nombre"; setOnClickListener { askPassengerName { text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre" } } }
+  redrawThemeMessages = { redraw() }
+  val profile = Button(this).apply { text = "👤 Cambiar mi nombre"; setOnClickListener { askPassengerName { text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre" } } }
   profile.text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre"
   val entry = EditText(this).apply {
    hint = "Escribe un aviso del recorrido"; maxLines = 3; minLines = 1
