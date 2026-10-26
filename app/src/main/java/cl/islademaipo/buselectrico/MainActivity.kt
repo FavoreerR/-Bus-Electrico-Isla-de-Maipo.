@@ -127,21 +127,47 @@ class MainActivity : ComponentActivity() {
   }
   val messages = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(14,8,14,8) }
   val scroll = ScrollView(this).apply { addView(messages); isFillViewport = true }
+  val themeNames = arrayOf("Clásico", "Oscuro", "Rojo", "Azul")
+  val themeBackgrounds = intArrayOf(Color.rgb(243,244,246), Color.rgb(23,33,43), Color.rgb(253,232,232), Color.rgb(219,234,254))
+  val themeBubbles = intArrayOf(Color.WHITE, Color.rgb(51,65,85), Color.WHITE, Color.WHITE)
+  val themeText = intArrayOf(Color.rgb(35,35,35), Color.WHITE, Color.rgb(35,35,35), Color.rgb(35,35,35))
+  var selectedTheme = chatPrefs.getInt("chat_theme", 0).coerceIn(0, themeNames.lastIndex)
+  fun applyTheme() {
+   panel.setBackgroundColor(themeBackgrounds[selectedTheme])
+   scroll.setBackgroundColor(themeBackgrounds[selectedTheme])
+   messages.setBackgroundColor(themeBackgrounds[selectedTheme])
+  }
+  applyTheme()
+  var redrawThemeMessages: () -> Unit = {}\n  val themes = Button(this).apply {
+   text = "🎨 Fondo del chat: " + themeNames[selectedTheme]
+   setOnClickListener {
+    android.app.AlertDialog.Builder(this@MainActivity)
+     .setTitle("Elegir fondo del chat")
+     .setSingleChoiceItems(themeNames, selectedTheme) { dialog, which ->
+      selectedTheme = which
+      chatPrefs.edit().putInt("chat_theme", which).apply()
+      text = "🎨 Fondo del chat: " + themeNames[which]
+      applyTheme()
+      redrawThemeMessages()
+      dialog.dismiss()
+     }.setNegativeButton("Cancelar", null).show()
+   }
+  }
   fun redraw() {
-   messages.removeAllViews()
+   messages.removeAllViews()\n   applyTheme()
    if (localMessages.isEmpty()) messages.addView(TextView(this).apply {
     text = "Aún no hay avisos guardados. Escribe el primero."; textSize = 15f
-    setTextColor(Color.GRAY); setPadding(12,18,12,18)
+    setTextColor(if (selectedTheme == 1) Color.WHITE else Color.GRAY); setPadding(12,18,12,18)
    })
    localMessages.forEach { msg ->
     val bubble = TextView(this).apply {
-     text = msg; textSize = 15f; setTextColor(Color.rgb(35,35,35))
-     setBackgroundColor(Color.rgb(235,235,235)); setPadding(16,14,16,14)
+     text = msg; textSize = 15f; setTextColor(themeText[selectedTheme])
+     setBackgroundColor(themeBubbles[selectedTheme]); setPadding(16,14,16,14)
     }
     messages.addView(bubble, LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = 10 })
    }
   }
-  val profile = Button(this).apply { text = "👤 Cambiar mi nombre"; setOnClickListener { askPassengerName { text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre" } } }
+  redrawThemeMessages = { redraw() }\n  val profile = Button(this).apply { text = "👤 Cambiar mi nombre"; setOnClickListener { askPassengerName { text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre" } } }
   profile.text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre"
   val entry = EditText(this).apply {
    hint = "Escribe un aviso del recorrido"; maxLines = 3; minLines = 1
@@ -171,7 +197,7 @@ class MainActivity : ComponentActivity() {
   }
   val back = Button(this).apply { text = "← Volver al mapa"; setOnClickListener { setContentView(rootLayout) } }
   val bottom = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12,4,12,8) }
-  bottom.addView(profile); bottom.addView(entry); bottom.addView(send); bottom.addView(clear); bottom.addView(back)
+  bottom.addView(themes); bottom.addView(profile); bottom.addView(entry); bottom.addView(send); bottom.addView(clear); bottom.addView(back)
   panel.addView(title); panel.addView(notice)
   panel.addView(scroll, LinearLayout.LayoutParams(-1,0,1f)); panel.addView(bottom)
   redraw(); setContentView(panel)
