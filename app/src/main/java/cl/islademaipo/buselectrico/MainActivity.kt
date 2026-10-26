@@ -4,6 +4,10 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.graphics.Color
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.BitmapDrawable
 import android.view.Gravity
 import android.widget.*
 import androidx.activity.ComponentActivity
@@ -77,7 +81,8 @@ class MainActivity : ComponentActivity() {
        sightings.add(point to System.currentTimeMillis())
        Marker(map).apply {
         position = point
-        title = "Avistamiento de prueba: " + options[selected]
+        icon = busMarkerIcon()
+        title = "🚌 Avistamiento de prueba: " + options[selected]
         snippet = "Solo visible en este teléfono; no confirmado"
         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
         map.overlays.add(this)
@@ -211,6 +216,25 @@ class MainActivity : ComponentActivity() {
    v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
    insets
   }
+ }
+ private fun busMarkerIcon(): BitmapDrawable {
+  val density = resources.displayMetrics.density
+  val width = (64 * density).toInt().coerceAtLeast(64)
+  val height = (54 * density).toInt().coerceAtLeast(54)
+  val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+  val canvas = Canvas(bitmap)
+  val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+  paint.color = Color.WHITE
+  canvas.drawRoundRect(2f, 2f, width - 2f, height - 2f, 14f * density, 14f * density, paint)
+  paint.color = Color.rgb(25, 135, 84)
+  paint.style = Paint.Style.STROKE
+  paint.strokeWidth = 2.5f * density
+  canvas.drawRoundRect(2f, 2f, width - 2f, height - 2f, 14f * density, 14f * density, paint)
+  paint.style = Paint.Style.FILL
+  paint.textAlign = Paint.Align.CENTER
+  paint.textSize = 35f * density
+  canvas.drawText("🚌", width / 2f, 37f * density, paint)
+  return BitmapDrawable(resources, bitmap)
  }
  private fun addPlace(name:String,lat:Double,lon:Double) { Marker(map).apply { position=GeoPoint(lat,lon); title=name; setAnchor(Marker.ANCHOR_CENTER,Marker.ANCHOR_BOTTOM); map.overlays.add(this) } }
  private fun askLocation() { if (ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED) showMyLocation() else requestLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION)) }
