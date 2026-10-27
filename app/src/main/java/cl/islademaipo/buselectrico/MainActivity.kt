@@ -17,6 +17,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.gms.location.LocationServices
 import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.modules.SqlTileWriter
+import java.io.File
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
@@ -47,6 +49,10 @@ class MainActivity : ComponentActivity() {
  override fun onCreate(savedInstanceState: Bundle?) {
   super.onCreate(savedInstanceState)
   Configuration.getInstance().userAgentValue = packageName
+  Configuration.getInstance().osmdroidBasePath = File(cacheDir, "osmdroid")
+  Configuration.getInstance().osmdroidTileCache = File(cacheDir, "osmdroid/tiles")
+  Configuration.getInstance().tileFileSystemCacheMaxBytes = 120L * 1024 * 1024
+  Configuration.getInstance().tileFileSystemCacheTrimBytes = 90L * 1024 * 1024
   localMessages.clear()
   localMessages.addAll(chatPrefs.getString("messages", "")!!.split("§").map { it.replace("⏎", "\\n") }.filter { it.isNotBlank() }.takeLast(100))
   val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
@@ -56,10 +62,10 @@ class MainActivity : ComponentActivity() {
   root.addView(heading)
   status = TextView(this).apply { text = "Mapa Santiago ↔ Isla de Maipo. Ubicaciones de buses aún no conectadas."; textSize = 14f; setTextColor(Color.DKGRAY); setPadding(18,18,18,18) }
   root.addView(status)
-  map = MapView(this).apply { setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); setBuiltInZoomControls(true); controller.setZoom(11.0); controller.setCenter(GeoPoint(-33.66,-70.84)) }
+  map = MapView(this).apply { setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); setBuiltInZoomControls(false); setTilesScaledToDpi(true); controller.setZoom(11.0); controller.setCenter(GeoPoint(-33.66,-70.84)) }
   val mapTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-  val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { map.setTileSource(TileSourceFactory.MAPNIK); map.invalidate(); status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
-  val satellite = Button(this).apply { text = "🛰 Satélite"; setOnClickListener { map.setTileSource(satelliteTiles); map.invalidate(); status.text = "Imágenes satelitales Esri · No son imágenes en tiempo real." } }
+  val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { map.setTileSource(TileSourceFactory.MAPNIK); map.setUseDataConnection(true); map.invalidate(); status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
+  val satellite = Button(this).apply { text = "🛰 Satélite"; setOnClickListener { map.setTileSource(satelliteTiles); map.setUseDataConnection(true); map.invalidate(); status.text = "Imágenes satelitales Esri · No son imágenes en tiempo real." } }
   mapTools.addView(streets, LinearLayout.LayoutParams(0,-2,1f))
   mapTools.addView(satellite, LinearLayout.LayoutParams(0,-2,1f))
   root.addView(mapTools)
