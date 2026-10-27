@@ -18,12 +18,14 @@ import androidx.core.view.WindowInsetsCompat
 import com.google.android.gms.location.LocationServices
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 
 class MainActivity : ComponentActivity() {
  private lateinit var map: MapView
+ private val satelliteTiles by lazy { XYTileSource("EsriWorldImagery", 0, 19, 256, ".jpg", arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/")) }
  private lateinit var status: TextView
  private lateinit var rootLayout: LinearLayout
  private val localMessages = mutableListOf<String>()
@@ -47,8 +49,15 @@ class MainActivity : ComponentActivity() {
   root.addView(heading)
   status = TextView(this).apply { text = "Mapa Santiago ↔ Isla de Maipo. Ubicaciones de buses aún no conectadas."; textSize = 14f; setTextColor(Color.DKGRAY); setPadding(18,18,18,18) }
   root.addView(status)
-  map = MapView(this).apply { setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); controller.setZoom(10.3); controller.setCenter(GeoPoint(-33.59,-70.79)) }
+  map = MapView(this).apply { setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); setBuiltInZoomControls(true); controller.setZoom(11.0); controller.setCenter(GeoPoint(-33.66,-70.84)) }
+  val mapTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+  val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { map.setTileSource(TileSourceFactory.MAPNIK); map.invalidate(); status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
+  val satellite = Button(this).apply { text = "🛰 Satélite"; setOnClickListener { map.setTileSource(satelliteTiles); map.invalidate(); status.text = "Imágenes satelitales Esri · No son imágenes en tiempo real." } }
+  mapTools.addView(streets, LinearLayout.LayoutParams(0,-2,1f))
+  mapTools.addView(satellite, LinearLayout.LayoutParams(0,-2,1f))
+  root.addView(mapTools)
   root.addView(map, LinearLayout.LayoutParams(-1,0,1f))
+  root.addView(TextView(this).apply { text = "Calles © OpenStreetMap contributors · Satélite © Esri y proveedores"; textSize = 10f; setPadding(12,2,12,2) })
   addPlace("Santiago",-33.4489,-70.6693)
   addPlace("Talagante",-33.6639,-70.9275)
   addPlace("Isla de Maipo",-33.7535,-70.8993)
