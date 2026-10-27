@@ -33,9 +33,16 @@ class MainActivity : ComponentActivity() {
  private val sightings = mutableListOf<Pair<GeoPoint, Long>>()
  private val reportPrefs by lazy { getSharedPreferences("sighting_reports", MODE_PRIVATE) }
  private var myMarker: Marker? = null
+ private var retryReportAfterPermission = false
  private val locationClient by lazy { LocationServices.getFusedLocationProviderClient(this) }
  private val requestLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { perms ->
-   if (perms.values.any { it }) showMyLocation() else status.text = "Ubicación desactivada. Puedes explorar el mapa sin compartirla."
+   if (perms.values.any { it }) {
+    if (retryReportAfterPermission) { retryReportAfterPermission = false; reportSighting() }
+    else showMyLocation()
+   } else {
+    retryReportAfterPermission = false
+    status.text = "Ubicación desactivada. Puedes explorar el mapa sin compartirla."
+   }
  }
  override fun onCreate(savedInstanceState: Bundle?) {
   super.onCreate(savedInstanceState)
@@ -81,7 +88,8 @@ class MainActivity : ComponentActivity() {
    .setItems(options) { _, selected ->
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-     status.text = "Permite la ubicación para registrar el avistamiento y vuelve a intentarlo."
+     status.text = "Permite la ubicación para registrar el avistamiento."
+     retryReportAfterPermission = true
      askLocation()
     } else {
      status.text = "Buscando tu ubicación actual para el reporte..."
