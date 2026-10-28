@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1067164047739",
+    "project_id": "bus-isla-de-maipo",
+    "storage_bucket": "bus-isla-de-maipo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1067164047739:android:096459ee17497f352e45de",
+        "android_client_info": {
+          "package_name": "cl.islademaipo.buselectrico"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDxPskQ9mvb4DMyldHcF1FAf6OqDcK42og"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
