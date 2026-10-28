@@ -300,7 +300,8 @@ class MainActivity : ComponentActivity() {
   val profile = Button(this).apply { text = "👤 Cambiar mi nombre"; setOnClickListener { askPassengerName { text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre" } } }
   profile.text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre"
   val entry = EditText(this).apply {
-   hint = "Escribe un mensaje para los pasajeros"; maxLines = 3; minLines = 1\n   setTextColor(Color.rgb(30,41,59)); setHintTextColor(Color.rgb(100,116,139)); setBackgroundColor(Color.WHITE); setPadding(18,14,18,14)
+   hint = "Escribe un mensaje para los pasajeros"; maxLines = 3; minLines = 1
+    setTextColor(Color.rgb(30,41,59)); setHintTextColor(Color.rgb(100,116,139)); setBackgroundColor(Color.WHITE); setPadding(18,14,18,14)
    filters = arrayOf(android.text.InputFilter.LengthFilter(300))
   }
   val send = Button(this).apply {
