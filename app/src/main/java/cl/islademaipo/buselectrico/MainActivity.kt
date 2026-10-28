@@ -36,6 +36,10 @@ class MainActivity : ComponentActivity() {
  private var chatListener: ListenerRegistration? = null
  private var sightingListener: ListenerRegistration? = null
  private lateinit var map: MapView
+ private val streetTiles by lazy {
+  XYTileSource("OpenStreetMapHTTPS", 0, 19, 256, ".png",
+   arrayOf("https://tile.openstreetmap.org/"))
+ }
  private val satelliteTiles by lazy {
   object : XYTileSource("EsriWorldImagery", 0, 19, 256, ".jpg",
    arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/")) {
@@ -71,7 +75,7 @@ class MainActivity : ComponentActivity() {
  }
  override fun onCreate(savedInstanceState: Bundle?) {
   super.onCreate(savedInstanceState)
-  Configuration.getInstance().userAgentValue = "BusElectricoIslaDeMaipo/1.1 ($packageName)"
+  Configuration.getInstance().userAgentValue = "BusElectricoIslaDeMaipo/1.2 (Android; $packageName)"
   Configuration.getInstance().osmdroidBasePath = File(filesDir, "osmdroid").apply { mkdirs() }
   Configuration.getInstance().osmdroidTileCache = File(filesDir, "osmdroid/tiles").apply { mkdirs() }
   Configuration.getInstance().tileFileSystemCacheMaxBytes = 120L * 1024 * 1024
@@ -87,7 +91,7 @@ class MainActivity : ComponentActivity() {
   root.addView(status)
   satelliteMode = mapPrefs.getBoolean("satellite", false)
   map = MapView(this).apply {
-   setTileSource(if (satelliteMode) satelliteTiles else TileSourceFactory.MAPNIK)
+   setTileSource(if (satelliteMode) satelliteTiles else streetTiles)
    setMultiTouchControls(true)
    setBuiltInZoomControls(false)
    setTilesScaledToDpi(false)
@@ -95,12 +99,14 @@ class MainActivity : ComponentActivity() {
    setFlingEnabled(true)
    minZoomLevel = 5.0
    maxZoomLevel = 19.0
+   setHorizontalMapRepetitionEnabled(false)
+   setVerticalMapRepetitionEnabled(false)
    controller.setZoom(12.0)
    controller.setCenter(GeoPoint(-33.70,-70.88))
   }
   val mapTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-  val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { if (satelliteMode) { satelliteMode = false; mapPrefs.edit().putBoolean("satellite", false).apply(); map.setTileSource(TileSourceFactory.MAPNIK) }; status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
-  val satellite = Button(this).apply { text = "🛰 Satélite"; setOnClickListener { if (!satelliteMode) { satelliteMode = true; mapPrefs.edit().putBoolean("satellite", true).apply(); map.setTileSource(satelliteTiles) }; status.text = "Imágenes satelitales Esri · No son imágenes en tiempo real." } }
+  val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { if (satelliteMode) { satelliteMode = false; mapPrefs.edit().putBoolean("satellite", false).apply(); map.setTileSource(streetTiles); map.tileProvider.clearTileCache(); map.invalidate() }; status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
+  val satellite = Button(this).apply { text = "🛰 Satélite"; setOnClickListener { if (!satelliteMode) { satelliteMode = true; mapPrefs.edit().putBoolean("satellite", true).apply(); map.setTileSource(satelliteTiles); map.tileProvider.clearTileCache(); map.invalidate() }; status.text = "Imágenes satelitales Esri · No son imágenes en tiempo real." } }
   mapTools.addView(streets, LinearLayout.LayoutParams(0,-2,1f))
   mapTools.addView(satellite, LinearLayout.LayoutParams(0,-2,1f))
   root.addView(mapTools)
