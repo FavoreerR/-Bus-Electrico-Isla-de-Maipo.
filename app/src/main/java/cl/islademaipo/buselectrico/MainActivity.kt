@@ -243,7 +243,8 @@ class MainActivity : ComponentActivity() {
   val themeBubbles = intArrayOf(Color.WHITE, Color.rgb(51,65,85), Color.WHITE, Color.WHITE)
   val themeText = intArrayOf(Color.rgb(35,35,35), Color.WHITE, Color.rgb(35,35,35), Color.rgb(35,35,35))
   var selectedTheme = chatPrefs.getInt("chat_theme", 0).coerceIn(0, themeNames.lastIndex)
-  fun applyTheme() {\n   notice.setTextColor(if (selectedTheme == 1) Color.rgb(226,232,240) else Color.DKGRAY)
+  fun applyTheme() {
+   notice.setTextColor(if (selectedTheme == 1) Color.rgb(226,232,240) else Color.DKGRAY)
    panel.setBackgroundColor(themeBackgrounds[selectedTheme])
    scroll.setBackgroundColor(themeBackgrounds[selectedTheme])
    messages.setBackgroundColor(themeBackgrounds[selectedTheme])
