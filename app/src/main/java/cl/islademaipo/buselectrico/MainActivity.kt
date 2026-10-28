@@ -378,58 +378,78 @@ class MainActivity : ComponentActivity() {
   }
  }
  private fun ensurePassengerProfile() {
+  val localName = chatPrefs.getString("display_name", "")?.trim().orEmpty()
   val user = auth.currentUser
   if (user == null) {
+   if (localName.isBlank()) askPassengerName()
    auth.signInAnonymously().addOnSuccessListener { ensurePassengerProfile() }
-    .addOnFailureListener { Toast.makeText(this, "Necesitas conexión para registrar tu nombre.", Toast.LENGTH_LONG).show() }
+    .addOnFailureListener {
+     if (localName.isBlank()) Toast.makeText(this, "Puedes registrar tu nombre en este teléfono. Se sincronizará al recuperar la conexión.", Toast.LENGTH_LONG).show()
+    }
    return
   }
   db.collection("passenger_profiles").document(user.uid).get()
    .addOnSuccessListener { doc ->
-    val saved = doc.getString("name")
-    if (!saved.isNullOrBlank()) {
-     chatPrefs.edit().putString("display_name", saved).apply()
-    } else {
-     val old = chatPrefs.getString("display_name", "")?.trim().orEmpty()
-     if (old.length in 2..30) savePassengerProfile(old) else askPassengerName()
-    }
-   }
-   .addOnFailureListener { Toast.makeText(this, "No se pudo verificar tu perfil. Revisa internet.", Toast.LENGTH_LONG).show() }
- }
- private fun savePassengerProfile(name: String, dialog: android.app.AlertDialog? = null) {
-  val uid = auth.currentUser?.uid ?: return
-  db.collection("passenger_profiles").document(uid).set(mapOf("name" to name, "uid" to uid))
-   .addOnSuccessListener {
-    chatPrefs.edit().putString("display_name", name).apply()
-    dialog?.dismiss()
+    val saved = doc.getString("name")?.trim().orEmpty()
+    if (saved.isNotBlank()) chatPrefs.edit().putString("display_name", saved).apply()
+    else if (localName.length in 2..30) savePassengerProfile(localName)
+    else askPassengerName()
    }
    .addOnFailureListener {
-    Toast.makeText(this, "No se pudo guardar. Comprueba la conexión o reinicia la app.", Toast.LENGTH_LONG).show()
-    dialog?.getButton(android.app.AlertDialog.BUTTON_POSITIVE)?.isEnabled = true
+    if (localName.isBlank()) askPassengerName()
+    else Toast.makeText(this, "Nombre guardado en el teléfono. La verificación en línea está pendiente.", Toast.LENGTH_LONG).show()
    }
  }
+ private fun savePassengerProfile(name: String, dialog: android.app.AlertDialog? = null) {
+  val normalized = name.trim().replace(Regex("\\s+"), " ")
+  if (normalized.length !in 2..30) {
+   dialog?.getButton(android.app.AlertDialog.BUTTON_POSITIVE)?.isEnabled = true
+   return
+  }
+  // Persist locally first so a Firestore outage cannot block first-time setup.
+  chatPrefs.edit().putString("display_name", normalized).apply()
+  dialog?.dismiss()
+  val uid = auth.currentUser?.uid
+  if (uid == null) {
+   connectFirebase()
+   Toast.makeText(this, "Nombre guardado. Se sincronizará cuando haya conexión.", Toast.LENGTH_LONG).show()
+   return
+  }
+  val profile = db.collection("passenger_profiles").document(uid)
+  db.runTransaction { transaction ->
+   val existing = transaction.get(profile).getString("name")
+   if (existing.isNullOrBlank()) {
+    transaction.set(profile, mapOf("name" to normalized, "uid" to uid))
+    normalized
+   } else existing
+  }.addOnSuccessListener { serverName ->
+   chatPrefs.edit().putString("display_name", serverName).apply()
+  }.addOnFailureListener {
+   Toast.makeText(this, "Nombre guardado en este teléfono. Sincronización pendiente.", Toast.LENGTH_LONG).show()
+  }
+ }
+ private var nameDialogOpen = false
  private fun askPassengerName() {
-  if (!chatPrefs.getString("display_name", "").isNullOrBlank()) return
+  if (!chatPrefs.getString("display_name", "").isNullOrBlank() || nameDialogOpen) return
   val field = EditText(this).apply {
    hint = "Nombre o apodo (2 a 30 caracteres)"; setSingleLine(true)
    filters = arrayOf(android.text.InputFilter.LengthFilter(30))
   }
   val dialog = android.app.AlertDialog.Builder(this)
    .setTitle("Bienvenido al Bus Eléctrico")
-   .setMessage("Elige tu nombre público. Solo podrás configurarlo una vez y no podrás cambiarlo después. Para proteger tu privacidad, puedes usar un apodo.")
+   .setMessage("Elige tu nombre público. Solo podrás configurarlo una vez y no podrás cambiarlo después. Puedes usar un apodo.")
    .setView(field)
    .setPositiveButton("Confirmar nombre", null)
    .setCancelable(false).create()
+  dialog.setOnDismissListener { nameDialogOpen = false }
   dialog.setOnShowListener {
    dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
     val name = field.text.toString().trim().replace(Regex("\\s+"), " ")
-    if (name.length < 2) field.error = "Escribe al menos 2 caracteres"
-    else {
-     dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).isEnabled = false
-     savePassengerProfile(name, dialog)
-    }
+    if (name.length !in 2..30) field.error = "Escribe entre 2 y 30 caracteres"
+    else savePassengerProfile(name, dialog)
    }
   }
+  nameDialogOpen = true
   dialog.show()
  }
  private fun showChat() {
