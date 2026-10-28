@@ -133,6 +133,7 @@ class MainActivity : ComponentActivity() {
   buttons.addView(actionCard("⌁", "COMPARTIR GPS", "Compartir zona aproximada temporalmente", Color.rgb(0,102,238), Color.WHITE) { toggleGpsSharing() })
   buttons.addView(actionCard("💬", "CHAT COMUNITARIO", "Conversa con otros pasajeros", Color.rgb(0,155,95), Color.WHITE) { showChat() })
   buttons.addView(actionCard("◷", "HORARIOS DE BUS ELÉCTRICO", "Revisa todas las salidas y recorridos", Color.rgb(133,46,232), Color.WHITE) { showSchedules() })
+  buttons.addView(actionCard("✉", "RECLAMOS Y SUGERENCIAS", "Ayúdanos a mejorar la aplicación", Color.rgb(18,116,144), Color.WHITE) { showFeedbackForm() })
   val buttonScroll = ScrollView(this).apply { isFillViewport = false; addView(buttons); setBackgroundColor(Color.rgb(247,249,253)) }
   root.addView(buttonScroll, LinearLayout.LayoutParams(-1, dp(340)))
   setContentView(root)
@@ -183,6 +184,70 @@ class MainActivity : ComponentActivity() {
   android.graphics.drawable.GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
  private fun scheduleText(value: String, size: Float, color: Int, bold: Boolean = false): TextView =
   TextView(this).apply { text=value; textSize=size; setTextColor(color); if(bold) setTypeface(null, android.graphics.Typeface.BOLD) }
+ private fun showFeedbackForm() {
+  val categories = arrayOf("Sugerencia", "Reclamo", "Error de la aplicación")
+  var selected = 0
+  val content = LinearLayout(this).apply {
+   orientation = LinearLayout.VERTICAL
+   setPadding(dp(20), dp(12), dp(20), dp(8))
+  }
+  val intro = TextView(this).apply {
+   text = "Tu opinión ayuda a mejorar esta aplicación. No incluyas contraseñas, direcciones ni otros datos personales."
+   textSize = 14f
+   setTextColor(Color.DKGRAY)
+  }
+  val category = Spinner(this).apply {
+   adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, categories)
+  }
+  val message = EditText(this).apply {
+   hint = "Escribe tu reclamo o sugerencia (mínimo 10 caracteres)"
+   minLines = 4
+   maxLines = 7
+   inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+   filters = arrayOf(android.text.InputFilter.LengthFilter(1000))
+  }
+  content.addView(intro)
+  content.addView(category, LinearLayout.LayoutParams(-1, dp(54)))
+  content.addView(message)
+  val dialog = android.app.AlertDialog.Builder(this)
+   .setTitle("✉ Reclamos y sugerencias")
+   .setView(content)
+   .setNegativeButton("Cancelar", null)
+   .setPositiveButton("Enviar", null)
+   .create()
+  dialog.setOnShowListener {
+   val send = dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)
+   send.setOnClickListener {
+    val body = message.text.toString().trim()
+    selected = category.selectedItemPosition.coerceIn(categories.indices)
+    if (body.length < 10) {
+     message.error = "Escribe al menos 10 caracteres"
+     return@setOnClickListener
+    }
+    val uid = auth.currentUser?.uid
+    if (uid == null) {
+     connectFirebase()
+     Toast.makeText(this, "Conectando al servidor. Inténtalo de nuevo.", Toast.LENGTH_LONG).show()
+     return@setOnClickListener
+    }
+    send.isEnabled = false
+    db.collection("app_feedback").add(mapOf(
+     "category" to categories[selected],
+     "message" to body.take(1000),
+     "uid" to uid,
+     "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp(),
+     "status" to "nuevo"
+    )).addOnSuccessListener {
+     Toast.makeText(this, "Gracias. Tu comentario fue enviado.", Toast.LENGTH_LONG).show()
+     dialog.dismiss()
+    }.addOnFailureListener {
+     send.isEnabled = true
+     Toast.makeText(this, "No se pudo enviar. Revisa la conexión y los permisos de Firebase.", Toast.LENGTH_LONG).show()
+    }
+   }
+  }
+  dialog.show()
+ }
  private fun showSchedules() {
   val navy = Color.rgb(9,83,166); val blue = Color.rgb(0,126,192)
   val panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.rgb(244,248,253)) }
