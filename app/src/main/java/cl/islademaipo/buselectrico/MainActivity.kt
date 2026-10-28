@@ -118,20 +118,61 @@ class MainActivity : ComponentActivity() {
   restoreSightings()
   connectFirebase()
   listenSightings()
-  val buttons = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(14,10,14,14) }
-  val locate = Button(this).apply { text = "📍 Ver mi ubicación"; setOnClickListener { askLocation() } }
-  val report = Button(this).apply { text = "🚌 Reportar avistamiento del bus"; setOnClickListener { reportSighting() } }
-  val share = Button(this).apply { text = "🔒 Compartir GPS (próximamente)"; isEnabled = false }
-  val chat = Button(this).apply { text = "💬 Chat comunitario"; setOnClickListener { showChat() } }
-  val schedules = Button(this).apply { text = "🕒 Horarios de Bus Eléctrico"; setOnClickListener { showSchedules() } }
-  buttons.addView(locate); buttons.addView(report); buttons.addView(share); buttons.addView(chat); buttons.addView(schedules)
-  val buttonScroll = ScrollView(this).apply { isFillViewport = false; addView(buttons) }
-  root.addView(buttonScroll, LinearLayout.LayoutParams(-1, (270 * resources.displayMetrics.density).toInt()))
+  val buttons = LinearLayout(this).apply {
+   orientation = LinearLayout.VERTICAL
+   setPadding(dp(16),dp(12),dp(16),dp(18))
+   setBackgroundColor(Color.rgb(247,249,253))
+  }
+  buttons.addView(actionCard("📍", "VER MI UBICACIÓN", "Encuentra tu ubicación en el mapa", Color.WHITE, Color.rgb(17,35,76), true) { askLocation() })
+  buttons.addView(actionCard("🚌", "REPORTAR AVISTAMIENTO DEL BUS", "Marca en el mapa dónde viste el bus", Color.rgb(225,12,48), Color.WHITE) { reportSighting() })
+  buttons.addView(actionCard("⌁", "COMPARTIR GPS", "Comparte tu ubicación (próximamente)", Color.rgb(0,102,238), Color.WHITE, enabled = false) { })
+  buttons.addView(actionCard("💬", "CHAT COMUNITARIO", "Conversa con otros pasajeros", Color.rgb(0,155,95), Color.WHITE) { showChat() })
+  buttons.addView(actionCard("◷", "HORARIOS DE BUS ELÉCTRICO", "Revisa todas las salidas y recorridos", Color.rgb(133,46,232), Color.WHITE) { showSchedules() })
+  val buttonScroll = ScrollView(this).apply { isFillViewport = false; addView(buttons); setBackgroundColor(Color.rgb(247,249,253)) }
+  root.addView(buttonScroll, LinearLayout.LayoutParams(-1, dp(340)))
   setContentView(root)
   if (chatPrefs.getString("display_name", "").isNullOrBlank()) { root.post { askPassengerName() } }
  }
 
 
+ private fun actionCard(icon: String, title: String, subtitle: String, backgroundColor: Int, foregroundColor: Int, light: Boolean = false, enabled: Boolean = true, action: () -> Unit): LinearLayout {
+  val card = LinearLayout(this).apply {
+   orientation = LinearLayout.HORIZONTAL
+   gravity = Gravity.CENTER_VERTICAL
+   setPadding(dp(15),dp(13),dp(15),dp(13))
+   background = rounded(backgroundColor, 23)
+   elevation = dp(5).toFloat()
+   alpha = if(enabled) 1f else 0.60f
+   isClickable = enabled
+   isFocusable = enabled
+   contentDescription = "$title. $subtitle"
+   if(enabled) setOnClickListener { action() }
+  }
+  val symbol = TextView(this).apply {
+   text = icon; textSize = 29f; gravity = Gravity.CENTER
+   setTextColor(if(light) Color.rgb(225,12,48) else Color.WHITE)
+   background = rounded(if(light) Color.rgb(255,235,239) else Color.argb(55,255,255,255), 20)
+  }
+  card.addView(symbol, LinearLayout.LayoutParams(dp(64),dp(64)))
+  val labels = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(13),0,dp(4),0) }
+  labels.addView(TextView(this).apply {
+   text = title; textSize = 16f; setTextColor(foregroundColor)
+   setTypeface(null, android.graphics.Typeface.BOLD); maxLines = 2
+  })
+  labels.addView(TextView(this).apply {
+   text = subtitle; textSize = 12f
+   setTextColor(if(light) Color.rgb(93,110,140) else Color.WHITE)
+   setPadding(0,dp(5),0,0); maxLines = 2
+  })
+  card.addView(labels, LinearLayout.LayoutParams(0,-2,1f))
+  card.addView(TextView(this).apply {
+   text = if(enabled) "❯" else "🔒"; textSize = 22f; gravity = Gravity.CENTER
+   setTextColor(if(light) Color.rgb(225,12,48) else Color.WHITE)
+  }, LinearLayout.LayoutParams(dp(30),dp(48)))
+  return card.apply {
+   layoutParams = LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = dp(13) }
+  }
+ }
  private fun dp(n: Int): Int = (n * resources.displayMetrics.density).toInt()
  private fun rounded(color: Int, radius: Int = 18): android.graphics.drawable.GradientDrawable =
   android.graphics.drawable.GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
