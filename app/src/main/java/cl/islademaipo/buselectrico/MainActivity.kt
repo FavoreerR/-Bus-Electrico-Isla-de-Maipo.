@@ -35,6 +35,10 @@ class MainActivity : ComponentActivity() {
  private val db by lazy { FirebaseFirestore.getInstance() }
  private var chatListener: ListenerRegistration? = null
  private var sightingListener: ListenerRegistration? = null
+ private var gpsListener: ListenerRegistration? = null
+ private var gpsSharing = false
+ private var gpsCallback: com.google.android.gms.location.LocationCallback? = null
+ private val gpsMarkers = mutableListOf<Marker>()
  private lateinit var map: MapView
  private val streetTiles by lazy {
   XYTileSource("OpenStreetMapHTTPS", 0, 19, 256, ".png",
@@ -118,6 +122,7 @@ class MainActivity : ComponentActivity() {
   restoreSightings()
   connectFirebase()
   listenSightings()
+  listenSharedGps()
   val buttons = LinearLayout(this).apply {
    orientation = LinearLayout.VERTICAL
    setPadding(dp(16),dp(12),dp(16),dp(18))
@@ -125,7 +130,7 @@ class MainActivity : ComponentActivity() {
   }
   buttons.addView(actionCard("📍", "VER MI UBICACIÓN", "Encuentra tu ubicación en el mapa", Color.WHITE, Color.rgb(17,35,76), true) { askLocation() })
   buttons.addView(actionCard("🚌", "REPORTAR AVISTAMIENTO DEL BUS", "Marca en el mapa dónde viste el bus", Color.rgb(225,12,48), Color.WHITE) { reportSighting() })
-  buttons.addView(actionCard("⌁", "COMPARTIR GPS", "Comparte tu ubicación (próximamente)", Color.rgb(0,102,238), Color.WHITE, enabled = false) { })
+  buttons.addView(actionCard("⌁", "COMPARTIR GPS", "Compartir zona aproximada temporalmente", Color.rgb(0,102,238), Color.WHITE) { toggleGpsSharing() })
   buttons.addView(actionCard("💬", "CHAT COMUNITARIO", "Conversa con otros pasajeros", Color.rgb(0,155,95), Color.WHITE) { showChat() })
   buttons.addView(actionCard("◷", "HORARIOS DE BUS ELÉCTRICO", "Revisa todas las salidas y recorridos", Color.rgb(133,46,232), Color.WHITE) { showSchedules() })
   val buttonScroll = ScrollView(this).apply { isFillViewport = false; addView(buttons); setBackgroundColor(Color.rgb(247,249,253)) }
@@ -296,6 +301,91 @@ class MainActivity : ComponentActivity() {
     }
     map.invalidate()
    }
+ }
+ private fun listenSharedGps() {
+  gpsListener?.remove()
+  gpsListener = db.collection("shared_gps").addSnapshotListener { snapshot, error ->
+   if (error != null || snapshot == null || !::map.isInitialized) return@addSnapshotListener
+   gpsMarkers.forEach { map.overlays.remove(it) }
+   gpsMarkers.clear()
+   val now = System.currentTimeMillis()
+   snapshot.documents.forEach { doc ->
+    val lat = doc.getDouble("lat")
+    val lon = doc.getDouble("lon")
+    val time = doc.getLong("time") ?: 0L
+    if (lat != null && lon != null && lat in -90.0..90.0 && lon in -180.0..180.0 &&
+        time <= now && now - time < 120000L) {
+     val marker = Marker(map).apply {
+      position = GeoPoint(lat, lon)
+      title = "Zona aproximada compartida por un pasajero"
+      snippet = "Ubicación redondeada, no es seguimiento exacto"
+      setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+     }
+     gpsMarkers.add(marker)
+     map.overlays.add(marker)
+    }
+   }
+   map.invalidate()
+  }
+ }
+ private fun toggleGpsSharing() {
+  if (gpsSharing) {
+   stopGpsSharing()
+   Toast.makeText(this, "Dejaste de compartir tu zona.", Toast.LENGTH_LONG).show()
+   return
+  }
+  android.app.AlertDialog.Builder(this)
+   .setTitle("Compartir zona aproximada")
+   .setMessage("Otros usuarios de la app podrán ver una zona aproximada de 1 km, nunca tu posición exacta ni tu nombre. Solo se actualizará mientras la app esté abierta. Puedes detenerlo cuando quieras.")
+   .setNegativeButton("Cancelar", null)
+   .setPositiveButton("Aceptar y compartir") { _, _ ->
+    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+     Toast.makeText(this, "Autoriza ubicación y vuelve a pulsar Compartir GPS.", Toast.LENGTH_LONG).show()
+     askLocation()
+    } else startGpsSharing()
+   }.show()
+ }
+ private fun startGpsSharing() {
+  val uid = auth.currentUser?.uid
+  if (uid == null) {
+   connectFirebase()
+   Toast.makeText(this, "Conectando al servidor. Inténtalo nuevamente.", Toast.LENGTH_LONG).show()
+   return
+  }
+  gpsSharing = true
+  val request = com.google.android.gms.location.LocationRequest.Builder(
+   com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY, 30000L)
+   .setMinUpdateIntervalMillis(15000L).build()
+  val callback = object : com.google.android.gms.location.LocationCallback() {
+   override fun onLocationResult(result: com.google.android.gms.location.LocationResult) {
+    if (!gpsSharing) return
+    val location = result.lastLocation ?: return
+    // Roughly 1.1 km grid; never upload precise passenger coordinates.
+    val lat = kotlin.math.round(location.latitude * 100.0) / 100.0
+    val lon = kotlin.math.round(location.longitude * 100.0) / 100.0
+    db.collection("shared_gps").document(uid).set(mapOf(
+     "lat" to lat, "lon" to lon, "time" to System.currentTimeMillis(), "uid" to uid
+    )).addOnFailureListener {
+     status.text = "No se pudo compartir la zona. Revisa la conexión o las reglas de Firebase."
+     stopGpsSharing()
+    }
+   }
+  }
+  gpsCallback = callback
+  try {
+   locationClient.requestLocationUpdates(request, callback, mainLooper)
+   status.text = "Compartiendo zona aproximada. Pulsa CompartIR GPS para detener."
+  } catch (e: SecurityException) {
+   stopGpsSharing()
+   status.text = "Permiso de ubicación no disponible."
+  }
+ }
+ private fun stopGpsSharing() {
+  gpsSharing = false
+  gpsCallback?.let { locationClient.removeLocationUpdates(it) }
+  gpsCallback = null
+  auth.currentUser?.uid?.let { db.collection("shared_gps").document(it).delete() }
  }
  private fun reportSighting() {
   val options = arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")
@@ -588,7 +678,7 @@ class MainActivity : ComponentActivity() {
  private fun showMyLocation() { if (ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED) return
   locationClient.lastLocation.addOnSuccessListener { loc -> if (loc!=null) { myMarker?.let { map.overlays.remove(it) }; myMarker=Marker(map).apply { position=GeoPoint(loc.latitude,loc.longitude); title="Tu ubicación (solo en este teléfono)"; map.overlays.add(this) }; map.controller.setZoom(14.0); map.controller.setCenter(GeoPoint(loc.latitude,loc.longitude)); map.invalidate(); status.text="Tu ubicación se muestra solo en este dispositivo. No se envía a ningún servidor." } else status.text="No se pudo obtener la ubicación. Activa GPS e inténtalo nuevamente." }
  }
- override fun onDestroy(){ chatListener?.remove(); sightingListener?.remove(); if(::map.isInitialized) map.onDetach(); super.onDestroy() }
+ override fun onDestroy(){ stopGpsSharing(); gpsListener?.remove(); chatListener?.remove(); sightingListener?.remove(); if(::map.isInitialized) map.onDetach(); super.onDestroy() }
  override fun onResume(){super.onResume();if(::map.isInitialized)map.onResume()}
- override fun onPause(){if(::map.isInitialized)map.onPause();super.onPause()}
+ override fun onPause(){if(gpsSharing) stopGpsSharing();if(::map.isInitialized)map.onPause();super.onPause()}
 }
