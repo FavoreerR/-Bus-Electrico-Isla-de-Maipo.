@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "scripts": {
+    "admin": "node set-admin.cjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}
