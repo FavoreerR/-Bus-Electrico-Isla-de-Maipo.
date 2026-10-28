@@ -92,11 +92,86 @@ class MainActivity : ComponentActivity() {
   val report = Button(this).apply { text = "🚌 Reportar avistamiento del bus"; setOnClickListener { reportSighting() } }
   val share = Button(this).apply { text = "🔒 Compartir GPS (próximamente)"; isEnabled = false }
   val chat = Button(this).apply { text = "💬 Chat comunitario"; setOnClickListener { showChat() } }
-  buttons.addView(locate); buttons.addView(report); buttons.addView(share); buttons.addView(chat)
+  val schedules = Button(this).apply { text = "🕒 Horarios de Bus Eléctrico"; setOnClickListener { showSchedules() } }
+  buttons.addView(locate); buttons.addView(report); buttons.addView(share); buttons.addView(chat); buttons.addView(schedules)
   val buttonScroll = ScrollView(this).apply { isFillViewport = false; addView(buttons) }
-  root.addView(buttonScroll, LinearLayout.LayoutParams(-1, (220 * resources.displayMetrics.density).toInt()))
+  root.addView(buttonScroll, LinearLayout.LayoutParams(-1, (270 * resources.displayMetrics.density).toInt()))
   setContentView(root)
   if (chatPrefs.getString("display_name", "").isNullOrBlank()) { root.post { askPassengerName() } }
+ }
+
+ private fun showSchedules() {
+  val blue = Color.rgb(0, 119, 180)
+  val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
+  applySafeInsets(panel)
+  val heading = TextView(this).apply {
+   text = "🕒 Horarios de Bus Eléctrico"; textSize = 21f; setTextColor(Color.WHITE)
+   setBackgroundColor(blue); setPadding(20,24,20,24)
+  }
+  panel.addView(heading)
+  val scroll = ScrollView(this)
+  val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(16,12,16,16) }
+  content.addView(TextView(this).apply {
+   text = "Horarios informados en afiches compartidos. Confirma posibles cambios con el municipio antes de viajar."
+   textSize = 13f; setTextColor(Color.DKGRAY); setPadding(4,4,4,16)
+  })
+  try {
+   val raw = assets.open("horarios_buses.json").bufferedReader().use { it.readText() }
+   val routes = org.json.JSONObject(raw).getJSONArray("recorridos")
+   for (i in 0 until routes.length()) {
+    val route = routes.getJSONObject(i)
+    val name = route.getString("nombre")
+    val button = Button(this).apply {
+     text = "🚌 $name  ›"
+     isAllCaps = false
+     setOnClickListener { showScheduleDetails(route) }
+    }
+    content.addView(button, LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = 8 })
+   }
+  } catch (e: Exception) {
+   content.addView(TextView(this).apply { text = "No se pudieron cargar los horarios."; setTextColor(Color.RED) })
+  }
+  scroll.addView(content)
+  panel.addView(scroll, LinearLayout.LayoutParams(-1,0,1f))
+  panel.addView(Button(this).apply { text = "← Volver al mapa"; setOnClickListener { setContentView(rootLayout) } })
+  setContentView(panel)
+ }
+ private fun showScheduleDetails(route: org.json.JSONObject) {
+  val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
+  applySafeInsets(panel)
+  panel.addView(TextView(this).apply {
+   text = "🚌 " + route.optString("nombre"); textSize = 21f
+   setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(0,119,180)); setPadding(20,24,20,24)
+  })
+  val scroll = ScrollView(this)
+  val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20,14,20,18) }
+  if (route.has("requisito")) content.addView(TextView(this).apply {
+   text = "🎓 Requisito: " + route.optString("requisito") + " · Capacidad: " + route.optInt("capacidad") + " estudiantes"
+   textSize = 16f; setPadding(0,8,0,14)
+  })
+  val directions = route.getJSONArray("sentidos")
+  for (i in 0 until directions.length()) {
+   val direction = directions.getJSONObject(i)
+   content.addView(TextView(this).apply {
+    text = direction.getString("desde") + " → " + direction.getString("hacia")
+    textSize = 19f; setTextColor(Color.rgb(0,100,165)); setPadding(0,16,0,8)
+   })
+   val departures = direction.getJSONArray("salidas")
+   val hours = (0 until departures.length()).joinToString("  ·  ") { departures.getString(it) }
+   content.addView(TextView(this).apply {
+    text = "🕒 Salidas: $hours"; textSize = 17f; setTextColor(Color.DKGRAY); setPadding(0,0,0,12)
+   })
+   val stops = direction.getJSONArray("paradas")
+   for (j in 0 until stops.length()) {
+    content.addView(TextView(this).apply {
+     text = "🔸 " + stops.getString(j); textSize = 15f; setTextColor(Color.DKGRAY); setPadding(8,6,0,6)
+    })
+   }
+  }
+  scroll.addView(content)
+  panel.addView(scroll, LinearLayout.LayoutParams(-1,0,1f))
+  panel.addView(Button(this).apply { text = "← Volver a horarios"; setOnClickListener { showSchedules() } })
+  setContentView(panel)
  }
  private fun connectFirebase() {
   if (auth.currentUser == null) auth.signInAnonymously().addOnFailureListener {
