@@ -1,4 +1,4 @@
-plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
+plugins { id("com.android.application"); id("org.jetbrains.kotlin.android"); id("com.google.gms.google-services") }
 android {
  namespace = "cl.islademaipo.buselectrico"
  compileSdk = 35
@@ -7,6 +7,9 @@ android {
  kotlinOptions { jvmTarget = "17" }
 }
 dependencies {
+ implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+ implementation("com.google.firebase:firebase-firestore")
+ implementation("com.google.firebase:firebase-auth")
  implementation("androidx.core:core-ktx:1.15.0")
  implementation("androidx.activity:activity-ktx:1.9.3")
  implementation("com.google.android.material:material:1.12.0")
