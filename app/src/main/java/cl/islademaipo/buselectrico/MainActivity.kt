@@ -100,77 +100,104 @@ class MainActivity : ComponentActivity() {
   if (chatPrefs.getString("display_name", "").isNullOrBlank()) { root.post { askPassengerName() } }
  }
 
+
+ private fun dp(n: Int): Int = (n * resources.displayMetrics.density).toInt()
+ private fun rounded(color: Int, radius: Int = 18): android.graphics.drawable.GradientDrawable =
+  android.graphics.drawable.GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
+ private fun scheduleText(value: String, size: Float, color: Int, bold: Boolean = false): TextView =
+  TextView(this).apply { text=value; textSize=size; setTextColor(color); if(bold) setTypeface(null, android.graphics.Typeface.BOLD) }
  private fun showSchedules() {
-  val blue = Color.rgb(0, 119, 180)
-  val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
+  val navy = Color.rgb(9,83,166); val blue = Color.rgb(0,126,192)
+  val panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.rgb(244,248,253)) }
   applySafeInsets(panel)
-  val heading = TextView(this).apply {
-   text = "🕒 Horarios de Bus Eléctrico"; textSize = 21f; setTextColor(Color.WHITE)
-   setBackgroundColor(blue); setPadding(20,24,20,24)
-  }
-  panel.addView(heading)
-  val scroll = ScrollView(this)
-  val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(16,12,16,16) }
-  content.addView(TextView(this).apply {
-   text = "Horarios informados en afiches compartidos. Confirma posibles cambios con el municipio antes de viajar."
-   textSize = 13f; setTextColor(Color.DKGRAY); setPadding(4,4,4,16)
-  })
+  val header=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(22),dp(24),dp(20),dp(24))
+   background=android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,intArrayOf(blue,navy)).apply { cornerRadii=floatArrayOf(0f,0f,0f,0f,dp(28).toFloat(),dp(28).toFloat(),dp(28).toFloat(),dp(28).toFloat()) } }
+  header.addView(scheduleText("🚌  Horarios de Bus Eléctrico",23f,Color.WHITE,true))
+  header.addView(scheduleText("Recorridos y salidas · Isla de Maipo",14f,Color.WHITE).apply { setPadding(0,dp(8),0,0) })
+  panel.addView(header)
+  val scroll=ScrollView(this)
+  val content=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(16),dp(16),dp(18)) }
+  content.addView(scheduleText("Selecciona tu recorrido",20f,navy,true).apply { setPadding(dp(4),dp(4),0,dp(12)) })
   try {
-   val raw = assets.open("horarios_buses.json").bufferedReader().use { it.readText() }
-   val routes = org.json.JSONObject(raw).getJSONArray("recorridos")
-   for (i in 0 until routes.length()) {
-    val route = routes.getJSONObject(i)
-    val name = route.getString("nombre")
-    val button = Button(this).apply {
-     text = "🚌 $name  ›"
-     isAllCaps = false
-     setOnClickListener { showScheduleDetails(route) }
+   val routes=org.json.JSONObject(assets.open("horarios_buses.json").bufferedReader().use { it.readText() }).getJSONArray("recorridos")
+   for(i in 0 until routes.length()) {
+    val route=routes.getJSONObject(i)
+    val card=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(18),dp(16),dp(18),dp(16))
+     background=rounded(Color.WHITE,20); elevation=dp(3).toFloat() }
+    card.addView(scheduleText("🚌  "+route.optString("nombre")+"   ›",18f,navy,true))
+    val dirs=route.optJSONArray("sentidos")
+    if(dirs!=null && dirs.length()>0) {
+     val first=dirs.getJSONObject(0)
+     val times=first.optJSONArray("salidas")
+     val summary=if(times!=null) (0 until times.length()).take(5).joinToString("  ·  ") { times.getString(it) } else ""
+     card.addView(scheduleText("Salidas: $summary",14f,Color.rgb(77,91,111)).apply { setPadding(0,dp(8),0,0) })
     }
-    content.addView(button, LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = 8 })
+    card.setOnClickListener { showScheduleDetails(route) }
+    content.addView(card,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(12) })
    }
-  } catch (e: Exception) {
-   content.addView(TextView(this).apply { text = "No se pudieron cargar los horarios."; setTextColor(Color.RED) })
-  }
-  scroll.addView(content)
-  panel.addView(scroll, LinearLayout.LayoutParams(-1,0,1f))
-  panel.addView(Button(this).apply { text = "← Volver al mapa"; setOnClickListener { setContentView(rootLayout) } })
+  } catch(e:Exception) { content.addView(scheduleText("No se pudieron cargar los horarios.",16f,Color.RED)) }
+  content.addView(scheduleText("Horarios publicados en afiches municipales. Confirma posibles cambios antes de viajar.",12f,Color.DKGRAY))
+  scroll.addView(content); panel.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+  val back=Button(this).apply { text="← Volver al mapa"; isAllCaps=false; setTextColor(Color.WHITE); background=rounded(navy,16); setOnClickListener { setContentView(rootLayout) } }
+  panel.addView(back,LinearLayout.LayoutParams(-1,dp(54)).apply { setMargins(dp(16),dp(6),dp(16),dp(12)) })
   setContentView(panel)
  }
  private fun showScheduleDetails(route: org.json.JSONObject) {
-  val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
+  val navy=Color.rgb(9,83,166); val blue=Color.rgb(0,126,192); val red=Color.rgb(231,77,34)
+  val panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setBackgroundColor(Color.rgb(244,248,253)) }
   applySafeInsets(panel)
-  panel.addView(TextView(this).apply {
-   text = "🚌 " + route.optString("nombre"); textSize = 21f
-   setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(0,119,180)); setPadding(20,24,20,24)
-  })
-  val scroll = ScrollView(this)
-  val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20,14,20,18) }
-  if (route.has("requisito")) content.addView(TextView(this).apply {
-   text = "🎓 Requisito: " + route.optString("requisito") + " · Capacidad: " + route.optInt("capacidad") + " estudiantes"
-   textSize = 16f; setPadding(0,8,0,14)
-  })
-  val directions = route.getJSONArray("sentidos")
-  for (i in 0 until directions.length()) {
-   val direction = directions.getJSONObject(i)
-   content.addView(TextView(this).apply {
-    text = direction.getString("desde") + " → " + direction.getString("hacia")
-    textSize = 19f; setTextColor(Color.rgb(0,100,165)); setPadding(0,16,0,8)
-   })
-   val departures = direction.getJSONArray("salidas")
-   val hours = (0 until departures.length()).joinToString("  ·  ") { departures.getString(it) }
-   content.addView(TextView(this).apply {
-    text = "🕒 Salidas: $hours"; textSize = 17f; setTextColor(Color.DKGRAY); setPadding(0,0,0,12)
-   })
-   val stops = direction.getJSONArray("paradas")
-   for (j in 0 until stops.length()) {
-    content.addView(TextView(this).apply {
-     text = "🔸 " + stops.getString(j); textSize = 15f; setTextColor(Color.DKGRAY); setPadding(8,6,0,6)
-    })
-   }
+  val header=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(22),dp(22),dp(20),dp(24))
+   background=android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,intArrayOf(blue,navy)) }
+  header.addView(scheduleText("🚌  "+route.optString("nombre"),22f,Color.WHITE,true))
+  header.addView(scheduleText("Recorridos y horarios de salida",14f,Color.WHITE).apply { setPadding(0,dp(7),0,0) })
+  panel.addView(header)
+  val scroll=ScrollView(this)
+  val content=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(16),dp(18),dp(16),dp(18)) }
+  if(route.has("requisito")) {
+   val requirement=scheduleText("🎓 "+route.optString("requisito")+" · Capacidad: "+route.optInt("capacidad")+" estudiantes",15f,red,true)
+   requirement.setPadding(dp(14),dp(14),dp(14),dp(14)); requirement.background=rounded(Color.WHITE,16)
+   content.addView(requirement,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(14) })
   }
-  scroll.addView(content)
-  panel.addView(scroll, LinearLayout.LayoutParams(-1,0,1f))
-  panel.addView(Button(this).apply { text = "← Volver a horarios"; setOnClickListener { showSchedules() } })
+  val directions=route.getJSONArray("sentidos")
+  val tabs=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+  val detailHost=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
+  fun renderDirection(index:Int) {
+   detailHost.removeAllViews()
+   val direction=directions.getJSONObject(index)
+   val card=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(18),dp(18),dp(18),dp(20)); background=rounded(Color.WHITE,20); elevation=dp(2).toFloat() }
+   card.addView(scheduleText(direction.optString("desde")+" → "+direction.optString("hacia"),18f,navy,true).apply { setPadding(0,0,0,dp(14)) })
+   card.addView(scheduleText("HORARIOS DE SALIDA",13f,Color.rgb(82,99,122),true))
+   val times=direction.getJSONArray("salidas")
+   val timesLayout=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
+   var timeRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+   for(i in 0 until times.length()) {
+    if(i>0 && i%3==0) { timesLayout.addView(timeRow); timeRow=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL } }
+    val chip=scheduleText(times.getString(i),15f,Color.WHITE,true).apply { gravity=Gravity.CENTER; setPadding(dp(6),dp(11),dp(6),dp(11)); background=rounded(navy,12) }
+    timeRow.addView(chip,LinearLayout.LayoutParams(0,-2,1f).apply { setMargins(dp(2),dp(6),dp(2),dp(2)) })
+   }
+   timesLayout.addView(timeRow)
+   card.addView(timesLayout,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(18) })
+   card.addView(scheduleText("PARADAS DEL RECORRIDO",13f,Color.rgb(82,99,122),true).apply { setPadding(0,0,0,dp(8)) })
+   val stops=direction.getJSONArray("paradas")
+   for(j in 0 until stops.length()) {
+    val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL }
+    val marker=scheduleText(if(j==stops.length()-1) "●" else "●",19f,red,true).apply { gravity=Gravity.CENTER; setPadding(0,dp(7),dp(12),dp(7)) }
+    row.addView(marker)
+    row.addView(scheduleText(stops.getString(j),15f,Color.rgb(42,52,68),j==0||j==stops.length()-1))
+    card.addView(row)
+    if(j<stops.length()-1) card.addView(android.view.View(this).apply { setBackgroundColor(red) },LinearLayout.LayoutParams(dp(3),dp(12)).apply { leftMargin=dp(8) })
+   }
+   detailHost.addView(card)
+  }
+  for(i in 0 until directions.length()) {
+   val direction=directions.getJSONObject(i)
+   val tab=Button(this).apply { text=if(i==0) "IDA" else "REGRESO"; isAllCaps=false; setTextColor(Color.WHITE); background=rounded(if(i==0) navy else blue,14); setOnClickListener { renderDirection(i) } }
+   tabs.addView(tab,LinearLayout.LayoutParams(0,dp(50),1f).apply { setMargins(dp(3),0,dp(3),dp(14)) })
+  }
+  content.addView(tabs); content.addView(detailHost); renderDirection(0)
+  scroll.addView(content); panel.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+  val back=Button(this).apply { text="← Volver a horarios"; isAllCaps=false; setTextColor(Color.WHITE); background=rounded(navy,16); setOnClickListener { showSchedules() } }
+  panel.addView(back,LinearLayout.LayoutParams(-1,dp(54)).apply { setMargins(dp(16),dp(6),dp(16),dp(12)) })
   setContentView(panel)
  }
  private fun connectFirebase() {
