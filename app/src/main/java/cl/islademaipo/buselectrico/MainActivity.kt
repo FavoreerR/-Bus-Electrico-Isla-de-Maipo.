@@ -233,7 +233,7 @@ class MainActivity : ComponentActivity() {
    setBackgroundColor(red); setPadding(20,20,20,20)
   }
   val notice = TextView(this).apply {
-   text = "Chat público entre pasajeros. Evita compartir información personal. Evita compartir datos personales."
+   text = "Chat público entre pasajeros. Evita compartir datos personales."
    textSize = 13f; setTextColor(Color.DKGRAY); setPadding(20,14,20,14)
   }
   val messages = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(14,8,14,8) }
@@ -327,7 +327,8 @@ class MainActivity : ComponentActivity() {
  private fun applySafeInsets(view: android.view.View) {
   ViewCompat.setOnApplyWindowInsetsListener(view) { v, insets ->
    val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-   v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+   val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime())
+   v.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, keyboard.bottom))
    insets
   }
  }
