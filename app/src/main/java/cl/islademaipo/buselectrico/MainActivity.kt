@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
   Configuration.getInstance().tileFileSystemCacheMaxBytes = 120L * 1024 * 1024
   Configuration.getInstance().tileFileSystemCacheTrimBytes = 90L * 1024 * 1024
   localMessages.clear()
-  localMessages.addAll(chatPrefs.getString("messages", "")!!.split("§").map { it.replace("⏎", "\\n") }.filter { it.isNotBlank() }.takeLast(100))
+  localMessages.addAll(chatPrefs.getString("messages", "")!!.split("§").map { it.replace("⏎", "\n").replace("\\n", "\n") }.filter { it.isNotBlank() }.takeLast(100))
   val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
   val heading = TextView(this).apply { text = "🚌 Bus Eléctrico Isla de Maipo"; textSize = 21f; setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(198,40,40)); setPadding(22,28,12,28); gravity = Gravity.CENTER_VERTICAL }
   applySafeInsets(root)
@@ -234,7 +234,7 @@ class MainActivity : ComponentActivity() {
   }
   val notice = TextView(this).apply {
    text = "Chat público entre pasajeros. Evita compartir datos personales."
-   textSize = 13f; setTextColor(Color.DKGRAY); setPadding(20,14,20,14)
+   textSize = 13f; setTextColor(if (selectedTheme == 1) Color.rgb(226,232,240) else Color.DKGRAY); setPadding(20,14,20,14)
   }
   val messages = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(14,8,14,8) }
   val scroll = ScrollView(this).apply { addView(messages); isFillViewport = true }
@@ -243,7 +243,7 @@ class MainActivity : ComponentActivity() {
   val themeBubbles = intArrayOf(Color.WHITE, Color.rgb(51,65,85), Color.WHITE, Color.WHITE)
   val themeText = intArrayOf(Color.rgb(35,35,35), Color.WHITE, Color.rgb(35,35,35), Color.rgb(35,35,35))
   var selectedTheme = chatPrefs.getInt("chat_theme", 0).coerceIn(0, themeNames.lastIndex)
-  fun applyTheme() {
+  fun applyTheme() {\n   notice.setTextColor(if (selectedTheme == 1) Color.rgb(226,232,240) else Color.DKGRAY)
    panel.setBackgroundColor(themeBackgrounds[selectedTheme])
    scroll.setBackgroundColor(themeBackgrounds[selectedTheme])
    messages.setBackgroundColor(themeBackgrounds[selectedTheme])
@@ -274,7 +274,7 @@ class MainActivity : ComponentActivity() {
    })
    localMessages.forEach { msg ->
     val bubble = TextView(this).apply {
-     text = msg; textSize = 15f; setTextColor(themeText[selectedTheme])
+     text = msg.replace("\\n", "\n"); textSize = 15f; setTextColor(themeText[selectedTheme])
      setBackgroundColor(themeBubbles[selectedTheme]); setPadding(16,14,16,14)
     }
     messages.addView(bubble, LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = 10 })
@@ -292,7 +292,7 @@ class MainActivity : ComponentActivity() {
       val body = doc.getString("text") ?: ""
       val timestamp = doc.getLong("time") ?: 0L
       val clock = java.text.SimpleDateFormat("HH:mm", java.util.Locale("es","CL")).format(java.util.Date(timestamp))
-      localMessages.add("${name} · ${clock}\\n${body}")
+      localMessages.add("${name} · ${clock}\n${body}")
      }
      redraw(); scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
     }
@@ -300,7 +300,7 @@ class MainActivity : ComponentActivity() {
   val profile = Button(this).apply { text = "👤 Cambiar mi nombre"; setOnClickListener { askPassengerName { text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre" } } }
   profile.text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre"
   val entry = EditText(this).apply {
-   hint = "Escribe un aviso del recorrido"; maxLines = 3; minLines = 1
+   hint = "Escribe un mensaje para los pasajeros"; maxLines = 3; minLines = 1\n   setTextColor(Color.rgb(30,41,59)); setHintTextColor(Color.rgb(100,116,139)); setBackgroundColor(Color.WHITE); setPadding(18,14,18,14)
    filters = arrayOf(android.text.InputFilter.LengthFilter(300))
   }
   val send = Button(this).apply {
