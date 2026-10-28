@@ -25,6 +25,7 @@ import org.osmdroid.tileprovider.modules.SqlTileWriter
 import java.io.File
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.util.MapTileIndex
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
@@ -35,7 +36,19 @@ class MainActivity : ComponentActivity() {
  private var chatListener: ListenerRegistration? = null
  private var sightingListener: ListenerRegistration? = null
  private lateinit var map: MapView
- private val satelliteTiles by lazy { XYTileSource("EsriWorldImagery", 0, 19, 256, ".jpg", arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/")) }
+ private val satelliteTiles by lazy {
+  object : XYTileSource("EsriWorldImagery", 0, 19, 256, ".jpg",
+   arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/")) {
+   override fun getTileURLString(pMapTileIndex: Long): String {
+    val z = MapTileIndex.getZoom(pMapTileIndex)
+    val x = MapTileIndex.getX(pMapTileIndex)
+    val y = MapTileIndex.getY(pMapTileIndex)
+    return baseUrl + "$z/$y/$x.jpg"
+   }
+  }
+ }
+ private val mapPrefs by lazy { getSharedPreferences("map_settings", MODE_PRIVATE) }
+ private var satelliteMode = false
  private lateinit var status: TextView
  private lateinit var rootLayout: LinearLayout
  private val localMessages = mutableListOf<String>()
@@ -72,10 +85,22 @@ class MainActivity : ComponentActivity() {
   root.addView(heading)
   status = TextView(this).apply { text = "Mapa Santiago ↔ Isla de Maipo. Ubicaciones de buses aún no conectadas."; textSize = 14f; setTextColor(Color.DKGRAY); setPadding(18,18,18,18) }
   root.addView(status)
-  map = MapView(this).apply { setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); setBuiltInZoomControls(false); setTilesScaledToDpi(true); controller.setZoom(11.0); controller.setCenter(GeoPoint(-33.66,-70.84)) }
+  satelliteMode = mapPrefs.getBoolean("satellite", false)
+  map = MapView(this).apply {
+   setTileSource(if (satelliteMode) satelliteTiles else TileSourceFactory.MAPNIK)
+   setMultiTouchControls(true)
+   setBuiltInZoomControls(false)
+   setTilesScaledToDpi(false)
+   setUseDataConnection(true)
+   setFlingEnabled(true)
+   minZoomLevel = 5.0
+   maxZoomLevel = 19.0
+   controller.setZoom(12.0)
+   controller.setCenter(GeoPoint(-33.70,-70.88))
+  }
   val mapTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-  val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { map.setTileSource(TileSourceFactory.MAPNIK); map.setUseDataConnection(true); map.invalidate(); status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
-  val satellite = Button(this).apply { text = "🛰 Satélite"; setOnClickListener { map.setTileSource(satelliteTiles); map.setUseDataConnection(true); map.invalidate(); status.text = "Imágenes satelitales Esri · No son imágenes en tiempo real." } }
+  val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { if (satelliteMode) { satelliteMode = false; mapPrefs.edit().putBoolean("satellite", false).apply(); map.setTileSource(TileSourceFactory.MAPNIK) }; status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
+  val satellite = Button(this).apply { text = "🛰 Satélite"; setOnClickListener { if (!satelliteMode) { satelliteMode = true; mapPrefs.edit().putBoolean("satellite", true).apply(); map.setTileSource(satelliteTiles) }; status.text = "Imágenes satelitales Esri · No son imágenes en tiempo real." } }
   mapTools.addView(streets, LinearLayout.LayoutParams(0,-2,1f))
   mapTools.addView(satellite, LinearLayout.LayoutParams(0,-2,1f))
   root.addView(mapTools)
@@ -460,7 +485,7 @@ class MainActivity : ComponentActivity() {
  private fun showMyLocation() { if (ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED) return
   locationClient.lastLocation.addOnSuccessListener { loc -> if (loc!=null) { myMarker?.let { map.overlays.remove(it) }; myMarker=Marker(map).apply { position=GeoPoint(loc.latitude,loc.longitude); title="Tu ubicación (solo en este teléfono)"; map.overlays.add(this) }; map.controller.setZoom(14.0); map.controller.setCenter(GeoPoint(loc.latitude,loc.longitude)); map.invalidate(); status.text="Tu ubicación se muestra solo en este dispositivo. No se envía a ningún servidor." } else status.text="No se pudo obtener la ubicación. Activa GPS e inténtalo nuevamente." }
  }
- override fun onDestroy(){ chatListener?.remove(); sightingListener?.remove(); super.onDestroy() }
+ override fun onDestroy(){ chatListener?.remove(); sightingListener?.remove(); if(::map.isInitialized) map.onDetach(); super.onDestroy() }
  override fun onResume(){super.onResume();if(::map.isInitialized)map.onResume()}
  override fun onPause(){if(::map.isInitialized)map.onPause();super.onPause()}
 }
