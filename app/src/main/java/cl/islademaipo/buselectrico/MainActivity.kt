@@ -131,7 +131,7 @@ class MainActivity : ComponentActivity() {
   val buttonScroll = ScrollView(this).apply { isFillViewport = false; addView(buttons); setBackgroundColor(Color.rgb(247,249,253)) }
   root.addView(buttonScroll, LinearLayout.LayoutParams(-1, dp(340)))
   setContentView(root)
-  if (chatPrefs.getString("display_name", "").isNullOrBlank()) { root.post { askPassengerName() } }
+  root.post { ensurePassengerProfile() }
  }
 
 
@@ -377,23 +377,57 @@ class MainActivity : ComponentActivity() {
    }
   }
  }
- private fun askPassengerName(afterSave: () -> Unit = {}) {
+ private fun ensurePassengerProfile() {
+  val user = auth.currentUser
+  if (user == null) {
+   auth.signInAnonymously().addOnSuccessListener { ensurePassengerProfile() }
+    .addOnFailureListener { Toast.makeText(this, "Necesitas conexión para registrar tu nombre.", Toast.LENGTH_LONG).show() }
+   return
+  }
+  db.collection("passenger_profiles").document(user.uid).get()
+   .addOnSuccessListener { doc ->
+    val saved = doc.getString("name")
+    if (!saved.isNullOrBlank()) {
+     chatPrefs.edit().putString("display_name", saved).apply()
+    } else {
+     val old = chatPrefs.getString("display_name", "")?.trim().orEmpty()
+     if (old.length in 2..30) savePassengerProfile(old) else askPassengerName()
+    }
+   }
+   .addOnFailureListener { Toast.makeText(this, "No se pudo verificar tu perfil. Revisa internet.", Toast.LENGTH_LONG).show() }
+ }
+ private fun savePassengerProfile(name: String, dialog: android.app.AlertDialog? = null) {
+  val uid = auth.currentUser?.uid ?: return
+  db.collection("passenger_profiles").document(uid).set(mapOf("name" to name, "uid" to uid))
+   .addOnSuccessListener {
+    chatPrefs.edit().putString("display_name", name).apply()
+    dialog?.dismiss()
+   }
+   .addOnFailureListener {
+    Toast.makeText(this, "No se pudo guardar. Comprueba la conexión o reinicia la app.", Toast.LENGTH_LONG).show()
+    dialog?.getButton(android.app.AlertDialog.BUTTON_POSITIVE)?.isEnabled = true
+   }
+ }
+ private fun askPassengerName() {
+  if (!chatPrefs.getString("display_name", "").isNullOrBlank()) return
   val field = EditText(this).apply {
-   hint = "Tu nombre o apodo"; setSingleLine(true)
+   hint = "Nombre o apodo (2 a 30 caracteres)"; setSingleLine(true)
    filters = arrayOf(android.text.InputFilter.LengthFilter(30))
-   setText(chatPrefs.getString("display_name", ""))
   }
   val dialog = android.app.AlertDialog.Builder(this)
-   .setTitle("Perfil de pasajero")
-   .setMessage("Elige el nombre que aparecerá en tus avisos. Usa un apodo si prefieres proteger tu privacidad.")
+   .setTitle("Bienvenido al Bus Eléctrico")
+   .setMessage("Elige tu nombre público. Solo podrás configurarlo una vez y no podrás cambiarlo después. Para proteger tu privacidad, puedes usar un apodo.")
    .setView(field)
-   .setPositiveButton("Guardar", null)
-   .setNegativeButton("Más tarde", null).create()
+   .setPositiveButton("Confirmar nombre", null)
+   .setCancelable(false).create()
   dialog.setOnShowListener {
    dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
     val name = field.text.toString().trim().replace(Regex("\\s+"), " ")
-    if (name.length < 2) { field.error = "Escribe al menos 2 caracteres" }
-    else { chatPrefs.edit().putString("display_name", name).apply(); dialog.dismiss(); afterSave() }
+    if (name.length < 2) field.error = "Escribe al menos 2 caracteres"
+    else {
+     dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).isEnabled = false
+     savePassengerProfile(name, dialog)
+    }
    }
   }
   dialog.show()
@@ -472,8 +506,10 @@ class MainActivity : ComponentActivity() {
      redraw(); scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
     }
    }
-  val profile = Button(this).apply { text = "👤 Cambiar mi nombre"; setOnClickListener { askPassengerName { text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre" } } }
-  profile.text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre"
+  val profile = TextView(this).apply {
+   text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Nombre permanente"
+   textSize = 15f; setPadding(18,12,18,12); setTextColor(Color.DKGRAY)
+  }
   val entry = EditText(this).apply {
    hint = "Escribe un mensaje para los pasajeros"; maxLines = 3; minLines = 1
     setTextColor(Color.rgb(30,41,59)); setHintTextColor(Color.rgb(100,116,139)); setBackgroundColor(Color.WHITE); setPadding(18,14,18,14)
