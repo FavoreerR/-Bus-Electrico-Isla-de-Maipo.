@@ -260,7 +260,7 @@ class MainActivity : ComponentActivity() {
   val options = arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")
   android.app.AlertDialog.Builder(this)
    .setTitle("Reportar avistamiento del bus")
-   .setMessage("Tu reporte aproximado será visible para otros pasajeros durante dos horas. No representa seguimiento GPS oficial. ¿Qué observaste?")
+   .setTitle("¿Qué observaste? · Reporte visible 2 horas")
    .setItems(options) { _, selected ->
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
