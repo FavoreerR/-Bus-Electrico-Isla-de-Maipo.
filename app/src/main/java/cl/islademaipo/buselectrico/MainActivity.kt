@@ -134,6 +134,7 @@ class MainActivity : ComponentActivity() {
   buttons.addView(actionCard("💬", "CHAT COMUNITARIO", "Conversa con otros pasajeros", Color.rgb(0,155,95), Color.WHITE) { showChat() })
   buttons.addView(actionCard("◷", "HORARIOS DE BUS ELÉCTRICO", "Revisa todas las salidas y recorridos", Color.rgb(133,46,232), Color.WHITE) { showSchedules() })
   buttons.addView(actionCard("✉", "RECLAMOS Y SUGERENCIAS", "Ayúdanos a mejorar la aplicación", Color.rgb(18,116,144), Color.WHITE) { showFeedbackForm() })
+  buttons.addView(actionCard("🛡", "ADMINISTRACIÓN", "Acceso privado del creador", Color.rgb(30,41,59), Color.WHITE) { showAdminLogin() })
   val buttonScroll = ScrollView(this).apply { isFillViewport = false; addView(buttons); setBackgroundColor(Color.rgb(247,249,253)) }
   root.addView(buttonScroll, LinearLayout.LayoutParams(-1, dp(340)))
   setContentView(root)
@@ -184,6 +185,129 @@ class MainActivity : ComponentActivity() {
   android.graphics.drawable.GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
  private fun scheduleText(value: String, size: Float, color: Int, bold: Boolean = false): TextView =
   TextView(this).apply { text=value; textSize=size; setTextColor(color); if(bold) setTypeface(null, android.graphics.Typeface.BOLD) }
+ private fun showAdminLogin() {
+  val email = EditText(this).apply {
+   hint = "Correo de administrador"
+   inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+  }
+  val password = EditText(this).apply {
+   hint = "Contraseña"
+   inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+  }
+  val content = LinearLayout(this).apply {
+   orientation = LinearLayout.VERTICAL
+   setPadding(dp(20), dp(8), dp(20), dp(8))
+   addView(email)
+   addView(password)
+  }
+  val dialog = android.app.AlertDialog.Builder(this)
+   .setTitle("🛡 Acceso de administrador")
+   .setView(content)
+   .setNegativeButton("Cancelar", null)
+   .setPositiveButton("Ingresar", null)
+   .create()
+  dialog.setOnShowListener {
+   val button = dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)
+   button.setOnClickListener {
+    val address = email.text.toString().trim()
+    val secret = password.text.toString()
+    if (address.isBlank() || secret.isBlank()) {
+     Toast.makeText(this, "Ingresa correo y contraseña.", Toast.LENGTH_SHORT).show()
+     return@setOnClickListener
+    }
+    button.isEnabled = false
+    auth.signInWithEmailAndPassword(address, secret).addOnSuccessListener { result ->
+     result.user?.getIdToken(true)?.addOnSuccessListener { token ->
+      if (token.claims["admin"] == true) {
+       dialog.dismiss()
+       showAdminPanel()
+      } else {
+       auth.signOut()
+       connectFirebase()
+       button.isEnabled = true
+       Toast.makeText(this, "Esta cuenta no tiene permiso de administrador.", Toast.LENGTH_LONG).show()
+      }
+     }?.addOnFailureListener {
+      button.isEnabled = true
+      Toast.makeText(this, "No se pudo verificar el permiso de administrador.", Toast.LENGTH_LONG).show()
+     }
+    }.addOnFailureListener {
+     button.isEnabled = true
+     Toast.makeText(this, "Credenciales incorrectas o acceso no disponible.", Toast.LENGTH_LONG).show()
+    }
+   }
+  }
+  dialog.show()
+ }
+ private fun showAdminPanel() {
+  val panel = LinearLayout(this).apply {
+   orientation = LinearLayout.VERTICAL
+   setBackgroundColor(Color.rgb(246,248,252))
+  }
+  applySafeInsets(panel)
+  panel.addView(TextView(this).apply {
+   text = "🛡 Panel de administración"
+   textSize = 23f
+   setTextColor(Color.WHITE)
+   setBackgroundColor(Color.rgb(30,41,59))
+   setPadding(dp(20), dp(22), dp(20), dp(22))
+  })
+  val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16),dp(12),dp(16),dp(12)) }
+  val scroll = ScrollView(this).apply { addView(list) }
+  panel.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+  panel.addView(Button(this).apply {
+   text = "Cerrar sesión y volver"
+   setOnClickListener { auth.signOut(); connectFirebase(); recreate() }
+  })
+  setContentView(panel)
+  auth.currentUser?.getIdToken(true)?.addOnSuccessListener { token ->
+   if (token.claims["admin"] != true) {
+    auth.signOut(); connectFirebase(); recreate()
+    return@addOnSuccessListener
+   }
+   db.collection("app_feedback").limit(100).get().addOnSuccessListener { snapshot ->
+    list.removeAllViews()
+    val docs = snapshot.documents.sortedByDescending { it.getTimestamp("createdAt")?.seconds ?: 0L }
+    if (docs.isEmpty()) list.addView(TextView(this).apply { text = "Todavía no hay mensajes." })
+    for (doc in docs) {
+     val item = LinearLayout(this).apply {
+      orientation = LinearLayout.VERTICAL
+      setPadding(dp(16),dp(14),dp(16),dp(14))
+      background = rounded(Color.WHITE, 16)
+     }
+     item.addView(TextView(this).apply {
+      text = (doc.getString("category") ?: "Comentario") + " · " + (doc.getString("status") ?: "nuevo")
+      textSize = 17f
+      setTypeface(null, android.graphics.Typeface.BOLD)
+     })
+     item.addView(TextView(this).apply {
+      text = doc.getString("message") ?: ""
+      textSize = 15f
+      setPadding(0,dp(8),0,dp(8))
+     })
+     if (doc.getString("status") != "resuelto") {
+      item.addView(Button(this).apply {
+       text = "Marcar como resuelto"
+       setOnClickListener {
+        isEnabled = false
+        doc.reference.update("status", "resuelto").addOnSuccessListener {
+         text = "✓ Resuelto"
+        }.addOnFailureListener {
+         isEnabled = true
+         Toast.makeText(this@MainActivity, "No se pudo actualizar.", Toast.LENGTH_SHORT).show()
+        }
+       }
+      })
+     }
+     list.addView(item, LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = dp(10) })
+    }
+   }.addOnFailureListener {
+    list.addView(TextView(this).apply { text = "No se pudieron cargar los mensajes. Revisa las reglas de Firebase." })
+   }
+  }?.addOnFailureListener {
+   auth.signOut(); connectFirebase(); recreate()
+  }
+ }
  private fun showFeedbackForm() {
   val categories = arrayOf("Sugerencia", "Reclamo", "Error de la aplicación")
   var selected = 0
