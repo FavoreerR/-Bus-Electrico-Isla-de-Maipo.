@@ -234,7 +234,7 @@ class MainActivity : ComponentActivity() {
   }
   val notice = TextView(this).apply {
    text = "Chat público entre pasajeros. Evita compartir datos personales."
-   textSize = 13f; setTextColor(if (selectedTheme == 1) Color.rgb(226,232,240) else Color.DKGRAY); setPadding(20,14,20,14)
+   textSize = 13f; setTextColor(Color.DKGRAY); setPadding(20,14,20,14)
   }
   val messages = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(14,8,14,8) }
   val scroll = ScrollView(this).apply { addView(messages); isFillViewport = true }
