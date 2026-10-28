@@ -1,0 +1,347 @@
+{
+  "nota": "Horarios transcritos de afiches compartidos por usuario; sujetos a confirmación municipal.",
+  "recorridos": [
+    {
+      "nombre": "Metro Lo Valledor",
+      "sentidos": [
+        {
+          "desde": "Isla Centro",
+          "hacia": "Metro Lo Valledor",
+          "salidas": [
+            "08:00"
+          ],
+          "paradas": [
+            "Plaza Isla Centro",
+            "Santelices",
+            "Lillo",
+            "Balmaceda",
+            "Villa Bicentenario",
+            "Villa Aires del Maipo",
+            "El Maitén",
+            "Santa Inés",
+            "Lo Guerra",
+            "Avda. Jaime Guzmán",
+            "Autopista del Sol",
+            "Est. Metro Lo Valledor"
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "Naltagua",
+      "sentidos": [
+        {
+          "desde": "Isla Centro",
+          "hacia": "San Antonio",
+          "salidas": [
+            "08:00",
+            "10:00",
+            "12:00",
+            "16:00",
+            "18:00",
+            "20:00"
+          ],
+          "paradas": [
+            "Plaza Isla Centro",
+            "Santelices",
+            "Alcalde López",
+            "Manuel Rodríguez",
+            "Lillo",
+            "Santelices",
+            "Cortés",
+            "Manuel Rodríguez",
+            "Jaime Guzmán",
+            "Santelices",
+            "San Luis",
+            "Jaime Guzmán",
+            "Puente Naltagua",
+            "Llavería",
+            "San Vicente",
+            "San Antonio de Naltagua",
+            "El Clavel"
+          ]
+        },
+        {
+          "desde": "San Antonio",
+          "hacia": "Isla Centro",
+          "salidas": [
+            "07:00",
+            "09:00",
+            "11:00",
+            "13:00",
+            "17:00",
+            "19:00",
+            "21:00"
+          ],
+          "paradas": [
+            "El Clavel",
+            "San Antonio de Naltagua",
+            "San Vicente",
+            "Llavería",
+            "Puente Naltagua",
+            "Gacitúa",
+            "López",
+            "Jaime Guzmán",
+            "Manuel Rodríguez",
+            "Alcalde López",
+            "Santelices",
+            "Plaza Isla Centro"
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "Monte Las Mercedes",
+      "sentidos": [
+        {
+          "desde": "Isla Centro",
+          "hacia": "Monte Las Mercedes",
+          "salidas": [
+            "08:00",
+            "10:00",
+            "12:00",
+            "16:00",
+            "18:00",
+            "19:40",
+            "21:20"
+          ],
+          "paradas": [
+            "Plaza Isla Centro",
+            "Santelices",
+            "Gálvez",
+            "Olea",
+            "Avda. Las Mercedes",
+            "Juan Francisco Fresno",
+            "San Martirian",
+            "Avda. Las Mercedes",
+            "Avda. San José",
+            "Monte Las Mercedes"
+          ]
+        },
+        {
+          "desde": "Monte Las Mercedes",
+          "hacia": "Isla Centro",
+          "salidas": [
+            "07:00",
+            "09:00",
+            "11:00",
+            "13:00",
+            "17:00",
+            "18:50",
+            "20:30",
+            "22:10"
+          ],
+          "paradas": [
+            "Monte Las Mercedes",
+            "Avda. San José",
+            "Avda. Las Mercedes",
+            "San Martirian",
+            "Juan Francisco Fresno",
+            "Avda. Las Mercedes",
+            "Olea",
+            "Gálvez",
+            "Santelices",
+            "Cortés",
+            "Manuel Rodríguez",
+            "Jaime Guzmán",
+            "Izaga",
+            "Plaza Isla Centro"
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "Metro Lo Valledor — estudiantes",
+      "requisito": "Presentar TNE",
+      "capacidad": 50,
+      "sentidos": [
+        {
+          "desde": "Isla Centro",
+          "hacia": "Metro Lo Valledor",
+          "salidas": [
+            "05:45"
+          ],
+          "paradas": [
+            "Plaza Isla Centro",
+            "Est. Metro Lo Valledor"
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "Talagante – Caperana nocturno",
+      "sentidos": [
+        {
+          "desde": "Talagante",
+          "hacia": "Caperana",
+          "salidas": [
+            "21:30"
+          ],
+          "paradas": [
+            "Rafael Calderón A. (Tottus Cordillera)",
+            "Bernardo O'Higgins",
+            "Arturo Prat",
+            "Lucas Pacheco",
+            "Enrique Alcalde",
+            "Libertad",
+            "Esmeralda",
+            "21 de Mayo",
+            "Avda. Jaime Guzmán",
+            "Lo Guerra",
+            "Armijo",
+            "Manuel Rodríguez",
+            "Avda. Jaime Guzmán",
+            "Izaga",
+            "Plaza de Armas",
+            "Santelices",
+            "Lillo",
+            "Balmaceda",
+            "La Islita",
+            "Santa Inés – Caperana"
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "Talagante",
+      "sentidos": [
+        {
+          "desde": "Isla Centro",
+          "hacia": "Talagante",
+          "salidas": [
+            "11:00",
+            "16:15",
+            "20:00"
+          ],
+          "paradas": [
+            "Plaza Isla Centro",
+            "Santelices",
+            "Lillo",
+            "Balmaceda",
+            "Cancha de Carreras",
+            "Villa Bicentenario",
+            "Balmaceda",
+            "Villa Aires del Maipo",
+            "Balmaceda",
+            "El Maitén",
+            "Brisas del Maipo",
+            "Santa Inés",
+            "La Herradura",
+            "Las Parcelas",
+            "Avda. Jaime Guzmán",
+            "21 de Mayo",
+            "Esmeralda",
+            "Darwin Vargas",
+            "Bernardo O'Higgins",
+            "Rafael Calderón A. (Tottus Cordillera)"
+          ]
+        },
+        {
+          "desde": "Talagante",
+          "hacia": "Isla Centro",
+          "salidas": [
+            "12:30",
+            "18:00"
+          ],
+          "paradas": [
+            "Rafael Calderón A. (Tottus Cordillera)",
+            "Bernardo O'Higgins",
+            "Arturo Prat",
+            "Lucas Pacheco",
+            "Enrique Alcalde",
+            "Libertad",
+            "Esmeralda",
+            "21 de Mayo",
+            "Avda. Jaime Guzmán",
+            "Las Parcelas",
+            "La Herradura",
+            "Santa Inés",
+            "El Maitén",
+            "Balmaceda",
+            "Villa Aires del Maipo",
+            "Villa Bicentenario",
+            "Cancha de Carreras",
+            "Balmaceda",
+            "Lillo",
+            "Santelices",
+            "Cortés",
+            "Manuel Rodríguez",
+            "Jaime Guzmán",
+            "Izaga",
+            "Plaza Isla Centro"
+          ]
+        }
+      ]
+    },
+    {
+      "nombre": "La Puntilla",
+      "sentidos": [
+        {
+          "desde": "Isla Centro",
+          "hacia": "La Puntilla",
+          "salidas": [
+            "08:00",
+            "10:00",
+            "12:00",
+            "16:00",
+            "18:00",
+            "20:00"
+          ],
+          "paradas": [
+            "Plaza Isla Centro",
+            "Santelices",
+            "Lillo",
+            "Balmaceda",
+            "Cancha de Carreras",
+            "Alcalde Ramón Jiménez",
+            "Michelle Bachelet",
+            "Balmaceda",
+            "Villa Aires del Maipo",
+            "Balmaceda",
+            "El Maitén",
+            "Brisas del Maipo",
+            "Santa Inés",
+            "Balmaceda",
+            "Bernardo O'Higgins",
+            "El Maicillo"
+          ]
+        },
+        {
+          "desde": "La Puntilla",
+          "hacia": "Isla Centro",
+          "salidas": [
+            "07:00",
+            "09:00",
+            "11:00",
+            "13:00",
+            "17:00",
+            "19:00",
+            "20:40"
+          ],
+          "paradas": [
+            "El Maicillo",
+            "Bernardo O'Higgins",
+            "Balmaceda",
+            "Santa Inés",
+            "Brisas del Maipo",
+            "El Maitén",
+            "Balmaceda",
+            "Villa Aires del Maipo",
+            "Balmaceda",
+            "Michelle Bachelet",
+            "Alcalde Ramón Jiménez",
+            "Cancha de Carreras",
+            "Balmaceda",
+            "Lillo",
+            "Santelices",
+            "Cortés",
+            "Manuel Rodríguez",
+            "Jaime Guzmán",
+            "Izaga",
+            "Plaza Isla Centro"
+          ]
+        }
+      ]
+    }
+  ]
+}
