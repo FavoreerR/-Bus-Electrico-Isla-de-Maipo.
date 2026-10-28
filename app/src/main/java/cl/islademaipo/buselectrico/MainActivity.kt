@@ -1,5 +1,9 @@
 package cl.islademaipo.buselectrico
 
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.Query
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -26,6 +30,10 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 
 class MainActivity : ComponentActivity() {
+ private val auth by lazy { FirebaseAuth.getInstance() }
+ private val db by lazy { FirebaseFirestore.getInstance() }
+ private var chatListener: ListenerRegistration? = null
+ private var sightingListener: ListenerRegistration? = null
  private lateinit var map: MapView
  private val satelliteTiles by lazy { XYTileSource("EsriWorldImagery", 0, 19, 256, ".jpg", arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/")) }
  private lateinit var status: TextView
@@ -77,6 +85,8 @@ class MainActivity : ComponentActivity() {
   addPlace("Talagante",-33.6639,-70.9275)
   addPlace("Isla de Maipo",-33.7535,-70.8993)
   restoreSightings()
+  connectFirebase()
+  listenSightings()
   val buttons = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(14,10,14,14) }
   val locate = Button(this).apply { text = "📍 Ver mi ubicación"; setOnClickListener { askLocation() } }
   val report = Button(this).apply { text = "🚌 Reportar avistamiento del bus"; setOnClickListener { reportSighting() } }
@@ -88,11 +98,36 @@ class MainActivity : ComponentActivity() {
   setContentView(root)
   if (chatPrefs.getString("display_name", "").isNullOrBlank()) { root.post { askPassengerName() } }
  }
+ private fun connectFirebase() {
+  if (auth.currentUser == null) auth.signInAnonymously().addOnFailureListener {
+   status.text = "Sin conexión con Firebase. Revisa internet y la configuración."
+  }
+ }
+ private fun listenSightings() {
+  sightingListener?.remove()
+  sightingListener = db.collection("sightings").orderBy("time", Query.Direction.DESCENDING).limit(100)
+   .addSnapshotListener { snapshot, error ->
+    if (error != null || snapshot == null || !::map.isInitialized) return@addSnapshotListener
+    val now = System.currentTimeMillis()
+    map.overlays.removeAll { it is Marker && it.title?.startsWith("🚌 Reporte de pasajero:") == true }
+    sightings.clear()
+    snapshot.documents.forEach { doc ->
+     val lat = doc.getDouble("lat"); val lon = doc.getDouble("lon")
+     val time = doc.getLong("time"); val option = doc.getLong("option")?.toInt()
+     if (lat != null && lon != null && time != null && option != null &&
+         lat in -90.0..90.0 && lon in -180.0..180.0 &&
+         time <= now && now - time < 7200000L && option in 0..2) {
+      addSightingMarker(GeoPoint(lat, lon), time, arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")[option])
+     }
+    }
+    map.invalidate()
+   }
+ }
  private fun reportSighting() {
   val options = arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")
   android.app.AlertDialog.Builder(this)
    .setTitle("Reportar avistamiento del bus")
-   .setMessage("Tu reporte será aproximado y solo visible en este teléfono por ahora. No representa seguimiento GPS oficial. ¿Qué observaste?")
+   .setMessage("Tu reporte aproximado será visible para otros pasajeros durante dos horas. No representa seguimiento GPS oficial. ¿Qué observaste?")
    .setItems(options) { _, selected ->
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -128,7 +163,12 @@ class MainActivity : ComponentActivity() {
         map.controller.setCenter(point)
         map.controller.setZoom(14.0)
         map.invalidate()
-        status.text = "Avistamiento registrado en este teléfono. No está publicado para otros pasajeros."
+        status.text = "Publicando avistamiento..."
+        val uid = auth.currentUser?.uid
+        if (uid == null) { connectFirebase(); status.text = "Conectando a Firebase. Reintenta el reporte." }
+        else db.collection("sightings").add(mapOf("lat" to latitude, "lon" to longitude, "time" to time, "option" to selected, "uid" to uid))
+         .addOnSuccessListener { status.text = "Avistamiento publicado para otros pasajeros." }
+         .addOnFailureListener { status.text = "No se pudo publicar. Reporte guardado solo en este teléfono." }
         Toast.makeText(this, "Avistamiento guardado", Toast.LENGTH_LONG).show()
        }
       }.addOnFailureListener { status.text = "No se pudo consultar el GPS. Inténtalo nuevamente." }
@@ -193,7 +233,7 @@ class MainActivity : ComponentActivity() {
    setBackgroundColor(red); setPadding(20,20,20,20)
   }
   val notice = TextView(this).apply {
-   text = "Chat local de prueba · Los mensajes se guardan solo en este teléfono. No los reciben otros pasajeros. Evita compartir datos personales."
+   text = "Chat público entre pasajeros. Evita compartir información personal. Evita compartir datos personales."
    textSize = 13f; setTextColor(Color.DKGRAY); setPadding(20,14,20,14)
   }
   val messages = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(14,8,14,8) }
@@ -241,6 +281,22 @@ class MainActivity : ComponentActivity() {
    }
   }
   redrawThemeMessages = { redraw() }
+  chatListener?.remove()
+  chatListener = db.collection("messages").orderBy("time", Query.Direction.DESCENDING).limit(100)
+   .addSnapshotListener { snapshot, error ->
+    if (error != null) { notice.text = "No se pudo cargar el chat público. Revisa internet y reglas."; return@addSnapshotListener }
+    if (snapshot != null) {
+     localMessages.clear()
+     snapshot.documents.reversed().forEach { doc ->
+      val name = doc.getString("name") ?: "Pasajero"
+      val body = doc.getString("text") ?: ""
+      val timestamp = doc.getLong("time") ?: 0L
+      val clock = java.text.SimpleDateFormat("HH:mm", java.util.Locale("es","CL")).format(java.util.Date(timestamp))
+      localMessages.add("${name} · ${clock}\\n${body}")
+     }
+     redraw(); scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+    }
+   }
   val profile = Button(this).apply { text = "👤 Cambiar mi nombre"; setOnClickListener { askPassengerName { text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre" } } }
   profile.text = "👤 " + chatPrefs.getString("display_name", "Pasajero") + " · Cambiar nombre"
   val entry = EditText(this).apply {
@@ -248,30 +304,22 @@ class MainActivity : ComponentActivity() {
    filters = arrayOf(android.text.InputFilter.LengthFilter(300))
   }
   val send = Button(this).apply {
-   text = "Enviar aviso local"; setOnClickListener {
-    val value = entry.text.toString().trim().replace("\\n", " ")
-    if (value.isNotEmpty()) {
-     val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale("es","CL")).format(java.util.Date())
-     val sender = chatPrefs.getString("display_name", "Pasajero") ?: "Pasajero"
-     localMessages.add("$sender · $time\\n$value")
-     while (localMessages.size > 100) localMessages.removeAt(0)
-     chatPrefs.edit().putString("messages", localMessages.joinToString("§") { it.replace("\\n", "⏎") }).apply()
-     entry.text.clear(); redraw(); scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
-    }
-   }
-  }
-  val clear = Button(this).apply {
-   text = "Borrar mensajes de este teléfono"
+   text = "Enviar mensaje público"
    setOnClickListener {
-    android.app.AlertDialog.Builder(this@MainActivity).setTitle("Borrar chat local")
-     .setMessage("¿Eliminar los avisos guardados en este teléfono?")
-     .setPositiveButton("Borrar") { _, _ -> localMessages.clear(); chatPrefs.edit().remove("messages").apply(); redraw() }
-     .setNegativeButton("Cancelar", null).show()
+    val value = entry.text.toString().trim().replace("\\n", " ")
+    val uid = auth.currentUser?.uid
+    if (value.isEmpty()) return@setOnClickListener
+    if (uid == null) { connectFirebase(); Toast.makeText(this@MainActivity, "Conectando. Reintenta en unos segundos.", Toast.LENGTH_LONG).show(); return@setOnClickListener }
+    val sender = (chatPrefs.getString("display_name", "Pasajero") ?: "Pasajero").take(30)
+    isEnabled = false
+    db.collection("messages").add(mapOf("name" to sender, "text" to value.take(300), "time" to System.currentTimeMillis(), "uid" to uid))
+     .addOnSuccessListener { entry.text.clear(); isEnabled = true }
+     .addOnFailureListener { isEnabled = true; Toast.makeText(this@MainActivity, "No se pudo enviar. Comprueba internet y reglas.", Toast.LENGTH_LONG).show() }
    }
   }
   val back = Button(this).apply { text = "← Volver al mapa"; setOnClickListener { setContentView(rootLayout) } }
   val bottom = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12,4,12,8) }
-  bottom.addView(themes); bottom.addView(profile); bottom.addView(entry); bottom.addView(send); bottom.addView(clear); bottom.addView(back)
+  bottom.addView(themes); bottom.addView(profile); bottom.addView(entry); bottom.addView(send); bottom.addView(back)
   panel.addView(title); panel.addView(notice)
   panel.addView(scroll, LinearLayout.LayoutParams(-1,0,1f)); panel.addView(bottom)
   redraw(); setContentView(panel)
@@ -307,6 +355,7 @@ class MainActivity : ComponentActivity() {
  private fun showMyLocation() { if (ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED) return
   locationClient.lastLocation.addOnSuccessListener { loc -> if (loc!=null) { myMarker?.let { map.overlays.remove(it) }; myMarker=Marker(map).apply { position=GeoPoint(loc.latitude,loc.longitude); title="Tu ubicación (solo en este teléfono)"; map.overlays.add(this) }; map.controller.setZoom(14.0); map.controller.setCenter(GeoPoint(loc.latitude,loc.longitude)); map.invalidate(); status.text="Tu ubicación se muestra solo en este dispositivo. No se envía a ningún servidor." } else status.text="No se pudo obtener la ubicación. Activa GPS e inténtalo nuevamente." }
  }
+ override fun onDestroy(){ chatListener?.remove(); sightingListener?.remove(); super.onDestroy() }
  override fun onResume(){super.onResume();if(::map.isInitialized)map.onResume()}
  override fun onPause(){if(::map.isInitialized)map.onPause();super.onPause()}
 }
