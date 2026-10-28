@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
     val z = MapTileIndex.getZoom(pMapTileIndex)
     val x = MapTileIndex.getX(pMapTileIndex)
     val y = MapTileIndex.getY(pMapTileIndex)
-    return baseUrl + "$z/$y/$x.jpg"
+    return baseUrl + "$z/$y/$x"
    }
   }
  }
@@ -71,9 +71,9 @@ class MainActivity : ComponentActivity() {
  }
  override fun onCreate(savedInstanceState: Bundle?) {
   super.onCreate(savedInstanceState)
-  Configuration.getInstance().userAgentValue = packageName
-  Configuration.getInstance().osmdroidBasePath = File(cacheDir, "osmdroid")
-  Configuration.getInstance().osmdroidTileCache = File(cacheDir, "osmdroid/tiles")
+  Configuration.getInstance().userAgentValue = "BusElectricoIslaDeMaipo/1.1 ($packageName)"
+  Configuration.getInstance().osmdroidBasePath = File(filesDir, "osmdroid").apply { mkdirs() }
+  Configuration.getInstance().osmdroidTileCache = File(filesDir, "osmdroid/tiles").apply { mkdirs() }
   Configuration.getInstance().tileFileSystemCacheMaxBytes = 120L * 1024 * 1024
   Configuration.getInstance().tileFileSystemCacheTrimBytes = 90L * 1024 * 1024
   localMessages.clear()
