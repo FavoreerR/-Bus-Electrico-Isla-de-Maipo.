@@ -36,13 +36,15 @@ class MainActivity : ComponentActivity() {
  private val reportPrefs by lazy { getSharedPreferences("sighting_reports", MODE_PRIVATE) }
  private var myMarker: Marker? = null
  private var retryReportAfterPermission = false
+ private var pendingSightingOption: Int? = null
  private val locationClient by lazy { LocationServices.getFusedLocationProviderClient(this) }
  private val requestLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { perms ->
    if (perms.values.any { it }) {
-    if (retryReportAfterPermission) { retryReportAfterPermission = false; reportSighting() }
+    if (retryReportAfterPermission) { retryReportAfterPermission = false; val selected = pendingSightingOption; pendingSightingOption = null; if (selected != null) saveSighting(selected) }
     else showMyLocation()
    } else {
     retryReportAfterPermission = false
+    pendingSightingOption = null
     status.text = "Ubicación desactivada. Puedes explorar el mapa sin compartirla."
    }
  }
@@ -94,10 +96,20 @@ class MainActivity : ComponentActivity() {
    .setItems(options) { _, selected ->
     if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-     status.text = "Permite la ubicación para registrar el avistamiento."
+     pendingSightingOption = selected
      retryReportAfterPermission = true
+     status.text = "Permite la ubicación para registrar el avistamiento."
      askLocation()
     } else {
+     saveSighting(selected)
+    }
+   }.setNegativeButton("Cancelar", null).show()
+ }
+
+ private fun saveSighting(selected: Int) {
+  val options = arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")
+  if (selected !in options.indices) return
+  if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
      status.text = "Buscando tu ubicación actual para el reporte..."
      val token = com.google.android.gms.tasks.CancellationTokenSource()
      locationClient.getCurrentLocation(com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY, token.token)
@@ -120,8 +132,6 @@ class MainActivity : ComponentActivity() {
         Toast.makeText(this, "Avistamiento guardado", Toast.LENGTH_LONG).show()
        }
       }.addOnFailureListener { status.text = "No se pudo consultar el GPS. Inténtalo nuevamente." }
-    }
-   }.setNegativeButton("Cancelar", null).show()
  }
  private fun addSightingMarker(point: GeoPoint, time: Long, description: String) {
   sightings.add(point to time)
