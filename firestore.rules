@@ -39,6 +39,18 @@ service cloud.firestore {
         && request.resource.data.time > request.time.toMillis() - 60000;
       allow update, delete: if false;
     }
+    match /app_feedback/{id} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll(['category','message','uid','createdAt','status'])
+        && request.resource.data.keys().hasOnly(['category','message','uid','createdAt','status'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.category in ['Sugerencia','Reclamo','Error de la aplicación']
+        && shortText(request.resource.data.message, 1000)
+        && request.resource.data.message.size() >= 10
+        && request.resource.data.status == 'nuevo'
+        && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if false;
+    }
     match /{document=**} { allow read, write: if false; }
   }
 }
