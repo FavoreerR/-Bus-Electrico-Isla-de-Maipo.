@@ -50,7 +50,11 @@ service cloud.firestore {
         && request.resource.data.message.size() >= 10
         && request.resource.data.status == 'nuevo'
         && request.resource.data.createdAt == request.time;
-      allow read, update: if isAdmin();
+      allow read: if isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && resource.data.status == 'nuevo'
+        && request.resource.data.status == 'resuelto';
       allow delete: if false;
     }
     match /{document=**} { allow read, write: if false; }
