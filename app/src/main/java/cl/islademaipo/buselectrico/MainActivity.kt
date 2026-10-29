@@ -79,6 +79,9 @@ class MainActivity : ComponentActivity() {
  private var myMarker: Marker? = null
  private var retryReportAfterPermission = false
  private var pendingSightingOption: Int? = null
+ private val sightingRoutes = arrayOf("Metro Lo Valledor", "Naltagua", "Monte Las Mercedes", "Metro Lo Valledor — estudiantes", "Talagante – Caperana nocturno", "Talagante", "La Puntilla")
+ private var selectedSightingRoute = ""
+ private var selectedSightingDirection = ""
  private val locationClient by lazy { LocationServices.getFusedLocationProviderClient(this) }
  private val requestLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { perms ->
    if (perms.values.any { it }) {
@@ -496,10 +499,12 @@ class MainActivity : ComponentActivity() {
     snapshot.documents.forEach { doc ->
      val lat = doc.getDouble("lat"); val lon = doc.getDouble("lon")
      val time = doc.getLong("time"); val option = doc.getLong("option")?.toInt()
+     val route = doc.getString("route") ?: "Recorrido no indicado"
+     val direction = doc.getString("direction") ?: "Dirección no indicada"
      if (lat != null && lon != null && time != null && option != null &&
          lat in -90.0..90.0 && lon in -180.0..180.0 &&
          time <= now && now - time < 7200000L && option in 0..2) {
-      addSightingMarker(GeoPoint(lat, lon), time, arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")[option])
+      addSightingMarker(GeoPoint(lat, lon), time, "$route · $direction · ${arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")[option]}")
      }
     }
     map.invalidate()
@@ -591,20 +596,27 @@ class MainActivity : ComponentActivity() {
   auth.currentUser?.uid?.let { db.collection("shared_gps").document(it).delete() }
  }
  private fun reportSighting() {
-  val options = arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")
   android.app.AlertDialog.Builder(this)
-   .setTitle("Reportar avistamiento del bus")
-   .setTitle("¿Qué observaste? · Reporte visible 2 horas")
-   .setItems(options) { _, selected ->
-    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-     pendingSightingOption = selected
-     retryReportAfterPermission = true
-     status.text = "Permite la ubicación para registrar el avistamiento."
-     askLocation()
-    } else {
-     saveSighting(selected)
-    }
+   .setTitle("¿Qué bus viste? · Selecciona el recorrido")
+   .setItems(sightingRoutes) { _, route ->
+    selectedSightingRoute = sightingRoutes[route]
+    val directions = arrayOf("Ida", "Regreso", "No lo sé")
+    android.app.AlertDialog.Builder(this)
+     .setTitle("Dirección de " + selectedSightingRoute)
+     .setItems(directions) { _, direction ->
+      selectedSightingDirection = directions[direction]
+      val options = arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")
+      android.app.AlertDialog.Builder(this)
+       .setTitle("¿Qué observaste? · Visible 2 horas")
+       .setItems(options) { _, selected ->
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+         pendingSightingOption = selected
+         retryReportAfterPermission = true
+         askLocation()
+        } else saveSighting(selected)
+       }.setNegativeButton("Cancelar", null).show()
+     }.setNegativeButton("Cancelar", null).show()
    }.setNegativeButton("Cancelar", null).show()
  }
 
@@ -624,16 +636,18 @@ class MainActivity : ComponentActivity() {
         val time = System.currentTimeMillis()
         val point = GeoPoint(latitude, longitude)
         val existing = reportPrefs.getString("reports", "") ?: ""
+        val route = selectedSightingRoute.ifBlank { "Sin recorrido" }
+        val direction = selectedSightingDirection.ifBlank { "No lo sé" }
         val row = "$latitude,$longitude,$time,$selected"
         reportPrefs.edit().putString("reports", (existing.split("|").filter { it.isNotBlank() }.takeLast(49) + row).joinToString("|")).apply()
-        addSightingMarker(point, time, options[selected])
+        addSightingMarker(point, time, "$route · $direction · ${options[selected]}")
         map.controller.setCenter(point)
         map.controller.setZoom(14.0)
         map.invalidate()
         status.text = "Publicando avistamiento..."
         val uid = auth.currentUser?.uid
         if (uid == null) { connectFirebase(); status.text = "Conectando a Firebase. Reintenta el reporte." }
-        else db.collection("sightings").add(mapOf("lat" to latitude, "lon" to longitude, "time" to time, "option" to selected, "uid" to uid))
+        else db.collection("sightings").add(mapOf("lat" to latitude, "lon" to longitude, "time" to time, "option" to selected, "route" to route, "direction" to direction, "uid" to uid))
          .addOnSuccessListener { status.text = "Avistamiento publicado para otros pasajeros." }
          .addOnFailureListener { status.text = "No se pudo publicar. Reporte guardado solo en este teléfono." }
         Toast.makeText(this, "Avistamiento guardado", Toast.LENGTH_LONG).show()
