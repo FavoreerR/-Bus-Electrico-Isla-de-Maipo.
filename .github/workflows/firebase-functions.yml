@@ -1,11 +1,6 @@
 name: Deploy Firebase Push Notifications
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'functions/**'
-      - '.github/workflows/firebase-functions.yml'
 permissions:
   contents: read
   id-token: write
