@@ -211,6 +211,7 @@ class MainActivity : ComponentActivity() {
    .setTitle("🚌 Guía rápida")
    .setView(panel)
    .setNegativeButton("Omitir", null)
+   .setNeutralButton("Anterior", null)
    .setPositiveButton("Siguiente", null)
    .create()
   fun render() {
@@ -219,9 +220,13 @@ class MainActivity : ComponentActivity() {
    description.text = descriptions[step]
    dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)?.text =
     if (step == titles.lastIndex) "Comenzar" else "Siguiente"
+   dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL)?.isEnabled = step > 0
   }
   dialog.setOnShowListener {
    render()
+   dialog.getButton(android.app.AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+    if (step > 0) { step--; render() }
+   }
    dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
     if (step == titles.lastIndex) {
      prefs.edit().putBoolean("completed_v1", true).apply()
