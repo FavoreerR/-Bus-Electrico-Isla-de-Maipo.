@@ -1,6 +1,8 @@
 package cl.islademaipo.buselectrico
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.messaging.FirebaseMessaging
+import android.os.Build
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
@@ -31,6 +33,17 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 
 class MainActivity : ComponentActivity() {
+ private val requestNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+ private fun setupNotifications() {
+  if (Build.VERSION.SDK_INT >= 26) {
+   val manager = getSystemService(android.app.NotificationManager::class.java)
+   manager.createNotificationChannel(android.app.NotificationChannel("bus_updates", "Avisos del Bus Eléctrico", android.app.NotificationManager.IMPORTANCE_DEFAULT))
+  }
+  if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+   requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+  }
+  FirebaseMessaging.getInstance().subscribeToTopic("bus_isla_maipo_updates")
+ }
  private val auth by lazy { FirebaseAuth.getInstance() }
  private val db by lazy { FirebaseFirestore.getInstance() }
  private var chatListener: ListenerRegistration? = null
@@ -79,6 +92,7 @@ class MainActivity : ComponentActivity() {
  }
  override fun onCreate(savedInstanceState: Bundle?) {
   super.onCreate(savedInstanceState)
+  setupNotifications()
   Configuration.getInstance().userAgentValue = "BusElectricoIslaDeMaipo/1.2 (Android; $packageName)"
   Configuration.getInstance().osmdroidBasePath = File(filesDir, "osmdroid").apply { mkdirs() }
   Configuration.getInstance().osmdroidTileCache = File(filesDir, "osmdroid/tiles").apply { mkdirs() }
