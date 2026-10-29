@@ -31,6 +31,8 @@ import org.osmdroid.util.MapTileIndex
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.TilesOverlay
+import org.osmdroid.tileprovider.MapTileProviderBasic
 
 class MainActivity : ComponentActivity() {
  private val requestNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -69,7 +71,7 @@ class MainActivity : ComponentActivity() {
   }
  }
  private val mapPrefs by lazy { getSharedPreferences("map_settings", MODE_PRIVATE) }
- private var satelliteMode = false
+ private var satelliteMode = true
  private lateinit var status: TextView
  private lateinit var rootLayout: LinearLayout
  private val localMessages = mutableListOf<String>()
@@ -123,7 +125,7 @@ class MainActivity : ComponentActivity() {
   root.addView(heading)
   status = TextView(this).apply { text = "Mapa Santiago ↔ Isla de Maipo. Ubicaciones de buses aún no conectadas."; textSize = 14f; setTextColor(Color.DKGRAY); setPadding(18,18,18,18) }
   root.addView(status)
-  satelliteMode = mapPrefs.getBoolean("satellite", false)
+  satelliteMode = mapPrefs.getBoolean("satellite", true)
   map = MapView(this).apply {
    setTileSource(if (satelliteMode) satelliteTiles else streetTiles)
    setMultiTouchControls(true)
@@ -138,14 +140,24 @@ class MainActivity : ComponentActivity() {
    controller.setZoom(12.0)
    controller.setCenter(GeoPoint(-33.70,-70.88))
   }
+  // Transparent geographic labels over satellite imagery: hybrid mode.
+  val labelTiles = object : XYTileSource("EsriReferenceLabels", 0, 19, 256, ".png",
+   arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/")) {
+   override fun getTileURLString(pMapTileIndex: Long): String {
+    return baseUrl + "${MapTileIndex.getZoom(pMapTileIndex)}/${MapTileIndex.getY(pMapTileIndex)}/${MapTileIndex.getX(pMapTileIndex)}"
+   }
+  }
+  val labelsProvider = MapTileProviderBasic(this, labelTiles)
+  val labelsOverlay = TilesOverlay(labelsProvider, this).apply { isEnabled = satelliteMode }
+  map.overlays.add(labelsOverlay)
   val mapTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-  val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { if (satelliteMode) { satelliteMode = false; mapPrefs.edit().putBoolean("satellite", false).apply(); map.setTileSource(streetTiles); map.maxZoomLevel = 19.0; map.postInvalidate() }; status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
-  val satellite = Button(this).apply { text = "🛰 Satélite"; setOnClickListener { if (!satelliteMode) { satelliteMode = true; mapPrefs.edit().putBoolean("satellite", true).apply(); map.setTileSource(satelliteTiles); map.maxZoomLevel = 18.0; if (map.zoomLevelDouble > 18.0) map.controller.setZoom(18.0); map.postInvalidate() }; status.text = "Imágenes satelitales Esri · No son imágenes en tiempo real." } }
+  val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { if (satelliteMode) { satelliteMode = false; mapPrefs.edit().putBoolean("satellite", false).apply(); map.setTileSource(streetTiles); labelsOverlay.isEnabled = false; map.maxZoomLevel = 19.0; map.postInvalidate() }; status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
+  val satellite = Button(this).apply { text = "🛰 Híbrido"; setOnClickListener { if (!satelliteMode) { satelliteMode = true; mapPrefs.edit().putBoolean("satellite", true).apply(); map.setTileSource(satelliteTiles); labelsOverlay.isEnabled = true; map.maxZoomLevel = 18.0; if (map.zoomLevelDouble > 18.0) map.controller.setZoom(18.0); map.postInvalidate() }; status.text = "Mapa híbrido: imágenes satelitales y nombres geográficos · No es tiempo real." } }
   mapTools.addView(streets, LinearLayout.LayoutParams(0,-2,1f))
   mapTools.addView(satellite, LinearLayout.LayoutParams(0,-2,1f))
   root.addView(mapTools)
   root.addView(map, LinearLayout.LayoutParams(-1,0,1f))
-  root.addView(TextView(this).apply { text = "Calles © OpenStreetMap contributors · Satélite © Esri y proveedores"; textSize = 10f; setPadding(12,2,12,2) })
+  root.addView(TextView(this).apply { text = "Calles © OpenStreetMap contributors · Satélite y etiquetas © Esri y proveedores"; textSize = 10f; setPadding(12,2,12,2) })
   addPlace("Santiago",-33.4489,-70.6693)
   addPlace("Talagante",-33.6639,-70.9275)
   addPlace("Isla de Maipo",-33.7535,-70.8993)
