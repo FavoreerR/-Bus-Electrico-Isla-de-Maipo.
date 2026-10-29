@@ -93,7 +93,7 @@ class AdminActivity : ComponentActivity() {
  private fun show(which:String) {
   tab=which
   base(when(which) { "Inicio"->"Panel de control"; "Mapa"->"Mapa de avistamientos"; "Buses"->"Buses y recorridos"; "Reportes"->"Reportes"; else->"Configuración" })
-  val scroll=ScrollView(this).apply { fillViewport=true }
+  val scroll=ScrollView(this).apply { isFillViewport=true }
   val body=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(2),dp(6),dp(2),0) }
   scroll.addView(body);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
   when(which) {
