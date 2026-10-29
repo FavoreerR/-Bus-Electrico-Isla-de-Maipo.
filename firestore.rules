@@ -27,12 +27,14 @@ service cloud.firestore {
     match /sightings/{id} {
       allow read: if signedIn();
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['lat','lon','time','option','uid'])
+        && request.resource.data.keys().hasOnly(['lat','lon','time','option','route','direction','uid'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.lat is number
         && request.resource.data.lon is number
         && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
         && request.resource.data.lon >= -180 && request.resource.data.lon <= 180
+        && request.resource.data.route in ['Metro Lo Valledor','Naltagua','Monte Las Mercedes','Metro Lo Valledor — estudiantes','Talagante – Caperana nocturno','Talagante','La Puntilla']
+        && request.resource.data.direction in ['Ida','Regreso','No lo sé']
         && request.resource.data.option is int
         && request.resource.data.option >= 0 && request.resource.data.option <= 2
         && request.resource.data.time is int
