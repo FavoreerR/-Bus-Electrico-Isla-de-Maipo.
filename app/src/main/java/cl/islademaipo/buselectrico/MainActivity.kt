@@ -158,6 +158,7 @@ class MainActivity : ComponentActivity() {
    setPadding(dp(16),dp(12),dp(16),dp(18))
    setBackgroundColor(Color.rgb(247,249,253))
   }
+  buttons.addView(actionCard("🚌", "VER BUSES REPORTADOS", "Encuentra los avistamientos del último minuto", Color.rgb(10,96,175), Color.WHITE) { showReportedBuses() })
   buttons.addView(actionCard("📍", "VER MI UBICACIÓN", "Encuentra tu ubicación en el mapa", Color.WHITE, Color.rgb(17,35,76), true) { askLocation() })
   buttons.addView(actionCard("🚌", "REPORTAR AVISTAMIENTO DEL BUS", "Marca en el mapa dónde viste el bus", Color.rgb(225,12,48), Color.WHITE) { reportSighting() })
   buttons.addView(actionCard("⌁", "COMPARTIR GPS", "Compartir zona aproximada temporalmente", Color.rgb(0,102,238), Color.WHITE) { toggleGpsSharing() })
@@ -522,6 +523,42 @@ class MainActivity : ComponentActivity() {
     }
     map.invalidate()
    }
+ }
+ private fun showReportedBuses() {
+  val now = System.currentTimeMillis()
+  val reports = map.overlays.filterIsInstance<Marker>()
+   .filter { it.title?.startsWith("🚌 Reporte de pasajero:") == true &&
+     (it.relatedObject as? Long)?.let { t -> t <= now && now - t < sightingLifetimeMs } == true }
+   .sortedByDescending { it.relatedObject as Long }
+  if (reports.isEmpty()) {
+   android.app.AlertDialog.Builder(this)
+    .setTitle("🚌 Buses reportados")
+    .setMessage("Todavía no hay avistamientos recientes. Los reportes aparecen durante 1 minuto. No son ubicaciones GPS en vivo.")
+    .setPositiveButton("Entendido", null).show()
+   return
+  }
+  val labels = reports.map { marker ->
+   val age = ((now - (marker.relatedObject as Long)) / 1000).coerceAtLeast(0)
+   val detail = marker.title?.removePrefix("🚌 Reporte de pasajero: ") ?: "Bus reportado"
+   "🚌 $detail\\nHace ${age} segundos · Reporte de pasajero"
+  }.toTypedArray()
+  android.app.AlertDialog.Builder(this)
+   .setTitle("🚌 Buses reportados (${reports.size})")
+   .setMessage("Toca un reporte para encontrarlo en el mapa. Son avistamientos de pasajeros, no GPS en vivo.")
+   .setItems(labels) { _, index ->
+    val marker = reports[index]
+    val timestamp = marker.relatedObject as Long
+    if (System.currentTimeMillis() - timestamp >= sightingLifetimeMs) {
+     Toast.makeText(this, "Este reporte ya venció.", Toast.LENGTH_SHORT).show()
+    } else {
+     map.controller.animateTo(marker.position)
+     map.controller.setZoom(16.0)
+     marker.showInfoWindow()
+     map.invalidate()
+     status.text = "🚌 Reporte seleccionado · Ubicación aproximada, no GPS en vivo."
+    }
+   }
+   .setNegativeButton("Cerrar", null).show()
  }
  private fun listenSharedGps() {
   gpsListener?.remove()
