@@ -8,7 +8,8 @@ if (credentials.project_id !== "bus-isla-de-maipo") { console.error("Service acc
 admin.initializeApp({ credential: admin.credential.cert(credentials) });
 const db = admin.firestore();
 const topic = "bus_isla_maipo_updates";
-const lookback = 10 * 60 * 1000;
+// Allow for delayed GitHub Actions schedules while keeping idempotency via notification_dispatch.
+const lookback = 60 * 60 * 1000;
 async function sendRecent(collection, kind) {
  const now = Date.now();
  const snapshot = await db.collection(collection).where("time", ">=", now - lookback).get();
