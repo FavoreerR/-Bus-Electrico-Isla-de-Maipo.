@@ -654,14 +654,38 @@ class MainActivity : ComponentActivity() {
        }
       }.addOnFailureListener { status.text = "No se pudo consultar el GPS. Inténtalo nuevamente." }
  }
+ private fun sectorBusIcon(route: String): BitmapDrawable {
+  val density = resources.displayMetrics.density
+  val width = (116 * density).toInt()
+  val height = (65 * density).toInt()
+  val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+  val canvas = Canvas(bitmap)
+  val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+  val palette = intArrayOf(Color.rgb(0, 121, 107), Color.rgb(21, 101, 192), Color.rgb(123, 31, 162), Color.rgb(230, 81, 0), Color.rgb(46, 125, 50), Color.rgb(173, 20, 87), Color.rgb(69, 90, 100))
+  val index = sightingRoutes.indexOf(route)
+  val color = palette[if (index >= 0) index % palette.size else 0]
+  paint.color = Color.WHITE
+  canvas.drawRoundRect(2f, 2f, width - 2f, height - 2f, 13f * density, 13f * density, paint)
+  paint.color = color
+  canvas.drawRoundRect(3f, 3f, width - 3f, 10f * density, 6f * density, 6f * density, paint)
+  paint.textAlign = Paint.Align.CENTER
+  paint.textSize = 29f * density
+  canvas.drawText("🚌", width / 2f, 39f * density, paint)
+  paint.color = Color.rgb(30, 41, 59)
+  paint.typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+  paint.textSize = 10f * density
+  val label = if (route.length > 19) route.take(18) + "…" else route
+  canvas.drawText(label, width / 2f, 56f * density, paint)
+  return BitmapDrawable(resources, bitmap)
+ }
  private fun addSightingMarker(point: GeoPoint, time: Long, description: String) {
   sightings.add(point to time)
   val clock = java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale("es", "CL")).format(java.util.Date(time))
   Marker(map).apply {
    position = point
-   icon = busMarkerIcon()
+   icon = sectorBusIcon(description.substringBefore(" · "))
    title = "🚌 Reporte de pasajero: $description"
-   snippet = "$clock · Ubicación aproximada · No confirmado · Solo este teléfono"
+   snippet = "$clock · Ubicación aproximada · Reportado por pasajeros, no GPS en vivo"
    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
    map.overlays.add(this)
   }
