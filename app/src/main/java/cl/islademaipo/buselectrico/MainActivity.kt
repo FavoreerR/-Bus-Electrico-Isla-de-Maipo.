@@ -158,6 +158,7 @@ class MainActivity : ComponentActivity() {
    setPadding(dp(16),dp(12),dp(16),dp(18))
    setBackgroundColor(Color.rgb(247,249,253))
   }
+  buttons.addView(actionCard("❔", "CÓMO USAR LA APP", "Tutorial rápido para pasajeros", Color.rgb(240,247,255), Color.rgb(9,83,166), true) { showPassengerGuide() })
   buttons.addView(actionCard("🚌", "VER BUSES REPORTADOS", "Encuentra los avistamientos del último minuto", Color.rgb(10,96,175), Color.WHITE) { showReportedBuses() })
   buttons.addView(actionCard("📍", "VER MI UBICACIÓN", "Encuentra tu ubicación en el mapa", Color.WHITE, Color.rgb(17,35,76), true) { askLocation() })
   buttons.addView(actionCard("🚌", "REPORTAR AVISTAMIENTO DEL BUS", "Marca en el mapa dónde viste el bus", Color.rgb(225,12,48), Color.WHITE) { reportSighting() })
@@ -169,10 +170,71 @@ class MainActivity : ComponentActivity() {
   val buttonScroll = ScrollView(this).apply { isFillViewport = false; addView(buttons); setBackgroundColor(Color.rgb(247,249,253)) }
   root.addView(buttonScroll, LinearLayout.LayoutParams(-1, dp(340)))
   setContentView(root)
-  root.post { ensurePassengerProfile() }
+  root.post { ensurePassengerProfile(); showFirstRunGuide() }
  }
 
 
+ private fun showFirstRunGuide() {
+  val prefs = getSharedPreferences("passenger_guide", MODE_PRIVATE)
+  if (!prefs.getBoolean("completed_v1", false)) showPassengerGuide()
+ }
+ private fun showPassengerGuide() {
+  val titles = arrayOf("¡Bienvenido!", "Consulta el mapa", "Reporta un bus", "¡Ya puedes comenzar!")
+  val descriptions = arrayOf(
+   "Bus Eléctrico Isla de Maipo te ayuda a consultar recorridos y avisos de otros pasajeros.",
+   "Toca VER BUSES REPORTADOS para ver los avistamientos del último minuto. No son ubicaciones GPS en vivo.",
+   "Toca REPORTAR AVISTAMIENTO DEL BUS, elige el recorrido y la dirección y sigue las instrucciones.",
+   "Consulta horarios, participa en el chat comunitario y vuelve a esta guía cuando lo necesites."
+  )
+  val prefs = getSharedPreferences("passenger_guide", MODE_PRIVATE)
+  var step = 0
+  val panel = LinearLayout(this).apply {
+   orientation = LinearLayout.VERTICAL
+   setPadding(dp(22), dp(18), dp(22), dp(8))
+  }
+  val progress = TextView(this).apply { textSize = 13f; setTextColor(Color.rgb(9,83,166)) }
+  val title = TextView(this).apply {
+   textSize = 23f
+   setTextColor(Color.rgb(9,83,166))
+   setTypeface(null, android.graphics.Typeface.BOLD)
+   setPadding(0, dp(16), 0, dp(12))
+  }
+  val description = TextView(this).apply {
+   textSize = 17f
+   setTextColor(Color.DKGRAY)
+   setPadding(0, 0, 0, dp(18))
+  }
+  panel.addView(progress)
+  panel.addView(title)
+  panel.addView(description)
+  val dialog = android.app.AlertDialog.Builder(this)
+   .setTitle("🚌 Guía rápida")
+   .setView(panel)
+   .setNegativeButton("Omitir", null)
+   .setPositiveButton("Siguiente", null)
+   .create()
+  fun render() {
+   progress.text = "Paso ${step + 1} de 4"
+   title.text = titles[step]
+   description.text = descriptions[step]
+   dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)?.text =
+    if (step == titles.lastIndex) "Comenzar" else "Siguiente"
+  }
+  dialog.setOnShowListener {
+   render()
+   dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+    if (step == titles.lastIndex) {
+     prefs.edit().putBoolean("completed_v1", true).apply()
+     dialog.dismiss()
+    } else {
+     step++
+     render()
+    }
+   }
+  }
+  dialog.setOnDismissListener { prefs.edit().putBoolean("completed_v1", true).apply() }
+  dialog.show()
+ }
  private fun actionCard(icon: String, title: String, subtitle: String, backgroundColor: Int, foregroundColor: Int, light: Boolean = false, enabled: Boolean = true, action: () -> Unit): LinearLayout {
   val card = LinearLayout(this).apply {
    orientation = LinearLayout.HORIZONTAL
