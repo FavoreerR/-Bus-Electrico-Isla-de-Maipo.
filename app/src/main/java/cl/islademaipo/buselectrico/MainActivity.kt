@@ -179,43 +179,62 @@ class MainActivity : ComponentActivity() {
   if (!prefs.getBoolean("completed_v1", false)) showPassengerGuide()
  }
  private fun showPassengerGuide() {
-  val titles = arrayOf("¡Bienvenido!", "Consulta el mapa", "Reporta un bus", "¡Ya puedes comenzar!")
+  val titles = arrayOf("¡Bienvenido!", "Explora el mapa", "Encuentra buses reportados", "Reporta un avistamiento", "Consulta horarios y chat", "¡Listo para viajar!")
   val descriptions = arrayOf(
-   "Bus Eléctrico Isla de Maipo te ayuda a consultar recorridos y avisos de otros pasajeros.",
-   "Toca VER BUSES REPORTADOS para ver los avistamientos del último minuto. No son ubicaciones GPS en vivo.",
-   "Toca REPORTAR AVISTAMIENTO DEL BUS, elige el recorrido y la dirección y sigue las instrucciones.",
-   "Consulta horarios, participa en el chat comunitario y vuelve a esta guía cuando lo necesites."
+   "Esta aplicación reúne información de los recorridos del Bus Eléctrico Isla de Maipo y avisos compartidos por pasajeros.",
+   "Desliza el mapa con un dedo y usa dos dedos para acercar o alejar. Puedes elegir Calles o Satélite. El mapa no muestra buses en tiempo real.",
+   "Pulsa VER BUSES REPORTADOS. Elige un reporte de la lista y el mapa se centrará en ese lugar. Cada avistamiento dura 1 minuto y puede ser aproximado.",
+   "Cuando veas un bus, toca REPORTAR AVISTAMIENTO DEL BUS. Selecciona el recorrido, la dirección y sigue los pasos para compartir el lugar.",
+   "En HORARIOS DE BUS ELÉCTRICO puedes revisar recorridos y salidas. En CHAT COMUNITARIO puedes conversar con otros pasajeros.",
+   "Ya sabes cómo usar las funciones principales. Puedes volver a abrir esta guía desde CÓMO USAR LA APP."
   )
+  val symbols = arrayOf("🚌", "🗺️", "📍", "🚌", "💬", "✓")
   val prefs = getSharedPreferences("passenger_guide", MODE_PRIVATE)
   var step = 0
   val panel = LinearLayout(this).apply {
    orientation = LinearLayout.VERTICAL
-   setPadding(dp(22), dp(18), dp(22), dp(8))
+   setPadding(dp(22), dp(16), dp(22), dp(12))
+   setBackgroundColor(Color.WHITE)
   }
-  val progress = TextView(this).apply { textSize = 13f; setTextColor(Color.rgb(9,83,166)) }
+  val progress = TextView(this).apply { textSize = 14f; setTextColor(Color.rgb(9,83,166)) }
+  val symbol = TextView(this).apply {
+   textSize = 46f
+   gravity = Gravity.CENTER
+   setPadding(0, dp(20), 0, dp(12))
+  }
   val title = TextView(this).apply {
    textSize = 23f
    setTextColor(Color.rgb(9,83,166))
    setTypeface(null, android.graphics.Typeface.BOLD)
-   setPadding(0, dp(16), 0, dp(12))
+   gravity = Gravity.CENTER
   }
   val description = TextView(this).apply {
    textSize = 17f
+   setTextColor(Color.rgb(40,52,70))
+   gravity = Gravity.CENTER
+   setPadding(0, dp(15), 0, dp(22))
+  }
+  val disclaimer = TextView(this).apply {
+   text = "Los avistamientos son aportes de pasajeros, no seguimiento GPS en vivo."
+   textSize = 12f
    setTextColor(Color.DKGRAY)
-   setPadding(0, 0, 0, dp(18))
+   gravity = Gravity.CENTER
   }
   panel.addView(progress)
+  panel.addView(symbol)
   panel.addView(title)
   panel.addView(description)
+  panel.addView(disclaimer)
   val dialog = android.app.AlertDialog.Builder(this)
-   .setTitle("🚌 Guía rápida")
+   .setTitle("🚌 Aprende a usar la app")
    .setView(panel)
    .setNegativeButton("Omitir", null)
    .setNeutralButton("Anterior", null)
    .setPositiveButton("Siguiente", null)
    .create()
   fun render() {
-   progress.text = "Paso ${step + 1} de 4"
+   progress.text = "GUÍA RÁPIDA  ·  Paso ${step + 1} de ${titles.size}"
+   symbol.text = symbols[step]
    title.text = titles[step]
    description.text = descriptions[step]
    dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE)?.text =
