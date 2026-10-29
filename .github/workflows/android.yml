@@ -18,12 +18,11 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Build APK
-        run: gradle :app:assembleDebug :adminApp:assembleDebug --no-daemon
+        run: gradle :app:assembleDebug --no-daemon
       - name: Prepare public release APK
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/debug/app-debug.apk dist/BusElectrico-IslaDeMaipo.apk
-          cp adminApp/build/outputs/apk/debug/adminApp-debug.apk dist/BusElectrico-ADMIN.apk
           sha256sum dist/*.apk > dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
@@ -41,7 +40,6 @@ jobs:
             SHA-256: `SHA256SUMS.txt`
           files: |
             dist/BusElectrico-IslaDeMaipo.apk
-            dist/BusElectrico-ADMIN.apk
             dist/SHA256SUMS.txt
           make_latest: true
         env:
