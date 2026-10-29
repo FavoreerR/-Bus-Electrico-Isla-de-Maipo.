@@ -160,6 +160,7 @@ class MainActivity : ComponentActivity() {
   }
   buttons.addView(actionCard("❔", "CÓMO USAR LA APP", "Tutorial rápido para pasajeros", Color.rgb(240,247,255), Color.rgb(9,83,166), true) { showPassengerGuide() })
   buttons.addView(actionCard("🚌", "VER BUSES REPORTADOS", "Encuentra los avistamientos del último minuto", Color.rgb(10,96,175), Color.WHITE) { showReportedBuses() })
+  buttons.addView(actionCard("📋", "HISTORIAL DE AVISTAMIENTOS", "Últimos minutos y reportes de hoy por recorrido", Color.rgb(235,244,255), Color.rgb(9,83,166), true) { showSightingHistory() })
   buttons.addView(actionCard("📍", "VER MI UBICACIÓN", "Encuentra tu ubicación en el mapa", Color.WHITE, Color.rgb(17,35,76), true) { askLocation() })
   buttons.addView(actionCard("🚌", "REPORTAR AVISTAMIENTO DEL BUS", "Marca en el mapa dónde viste el bus", Color.rgb(225,12,48), Color.WHITE) { reportSighting() })
   buttons.addView(actionCard("⌁", "COMPARTIR GPS", "Compartir zona aproximada temporalmente", Color.rgb(0,102,238), Color.WHITE) { toggleGpsSharing() })
@@ -609,6 +610,96 @@ class MainActivity : ComponentActivity() {
     }
     map.invalidate()
    }
+ }
+ private fun showSightingHistory() {
+  val windows = arrayOf("Últimos 5 minutos", "Últimos 15 minutos", "Últimos 30 minutos", "Última hora", "Todo el día")
+  val durations = longArrayOf(300000L, 900000L, 1800000L, 3600000L, Long.MAX_VALUE)
+  val routeOptions = arrayOf("Todos los recorridos") + sightingRoutes
+  val container = LinearLayout(this).apply {
+   orientation = LinearLayout.VERTICAL
+   setPadding(dp(18), dp(12), dp(18), dp(12))
+  }
+  val explanation = TextView(this).apply {
+   text = "Consulta reportes enviados por pasajeros. Los registros históricos no indican dónde está el bus ahora."
+   textSize = 14f
+   setTextColor(Color.DKGRAY)
+   setPadding(0, 0, 0, dp(10))
+  }
+  val windowPicker = android.widget.Spinner(this)
+  val routePicker = android.widget.Spinner(this)
+  windowPicker.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, windows)
+  routePicker.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, routeOptions)
+  val results = TextView(this).apply {
+   text = "Cargando reportes..."
+   textSize = 15f
+   setTextColor(Color.rgb(30,41,59))
+   setPadding(0, dp(15), 0, dp(10))
+  }
+  container.addView(explanation)
+  container.addView(TextView(this).apply { text = "PERÍODO"; setTypeface(null, android.graphics.Typeface.BOLD) })
+  container.addView(windowPicker)
+  container.addView(TextView(this).apply { text = "RECORRIDO"; setTypeface(null, android.graphics.Typeface.BOLD); setPadding(0,dp(12),0,0) })
+  container.addView(routePicker)
+  val scroller = ScrollView(this).apply { addView(results) }
+  container.addView(scroller, LinearLayout.LayoutParams(-1, dp(330)))
+  val dialog = android.app.AlertDialog.Builder(this)
+   .setTitle("📋 Historial de avistamientos")
+   .setView(container)
+   .setNegativeButton("Cerrar", null)
+   .setPositiveButton("Actualizar", null)
+   .create()
+  fun load() {
+   results.text = "Consultando avistamientos..."
+   val now = System.currentTimeMillis()
+   val calendar = java.util.Calendar.getInstance().apply {
+    set(java.util.Calendar.HOUR_OF_DAY, 0)
+    set(java.util.Calendar.MINUTE, 0)
+    set(java.util.Calendar.SECOND, 0)
+    set(java.util.Calendar.MILLISECOND, 0)
+   }
+   val todayStart = calendar.timeInMillis
+   val window = durations[windowPicker.selectedItemPosition.coerceIn(durations.indices)]
+   val start = if (window == Long.MAX_VALUE) todayStart else maxOf(todayStart, now - window)
+   val route = routeOptions[routePicker.selectedItemPosition.coerceIn(routeOptions.indices)]
+   db.collection("sightings").orderBy("time", Query.Direction.DESCENDING)
+    .whereGreaterThanOrEqualTo("time", todayStart)
+    .limit(500)
+    .get()
+    .addOnSuccessListener { snapshot ->
+     if (!dialog.isShowing) return@addOnSuccessListener
+     val rows = snapshot.documents.mapNotNull { doc ->
+      val t = doc.getLong("time") ?: return@mapNotNull null
+      val r = doc.getString("route") ?: "Sin recorrido"
+      if (t < start || t > now || (route != "Todos los recorridos" && r != route)) return@mapNotNull null
+      val direction = doc.getString("direction") ?: "Sin dirección"
+      val event = when (doc.getLong("option")?.toInt()) {
+       0 -> "Bus pasando"
+       1 -> "Bus detenido"
+       2 -> "Salió del paradero"
+       else -> "Avistamiento"
+      }
+      val clock = java.text.SimpleDateFormat("HH:mm", java.util.Locale("es", "CL")).format(java.util.Date(t))
+      "🚌 $clock  ·  $r\\n     $direction · $event"
+     }
+     results.text = if (rows.isEmpty()) "No hay avistamientos en este período para el recorrido seleccionado."
+      else "${rows.size} avistamiento(s) encontrados\\n\\n" + rows.joinToString("\\n\\n") +
+       if (snapshot.size() >= 500) "\\n\\nSe muestran los 500 reportes más recientes del día como máximo." else ""
+    }
+    .addOnFailureListener {
+     if (dialog.isShowing) results.text = "No se pudo consultar el historial. Comprueba la conexión y los permisos de lectura de Firebase."
+    }
+  }
+  val change = object : android.widget.AdapterView.OnItemSelectedListener {
+   override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+   override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) { if (dialog.isShowing) load() }
+  }
+  windowPicker.onItemSelectedListener = change
+  routePicker.onItemSelectedListener = change
+  dialog.setOnShowListener {
+   dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener { load() }
+   load()
+  }
+  dialog.show()
  }
  private fun showReportedBuses() {
   val now = System.currentTimeMillis()
