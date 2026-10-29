@@ -132,15 +132,15 @@ class MainActivity : ComponentActivity() {
    setUseDataConnection(true)
    setFlingEnabled(true)
    minZoomLevel = 5.0
-   maxZoomLevel = 19.0
+   maxZoomLevel = if (satelliteMode) 18.0 else 19.0
    setHorizontalMapRepetitionEnabled(false)
    setVerticalMapRepetitionEnabled(false)
    controller.setZoom(12.0)
    controller.setCenter(GeoPoint(-33.70,-70.88))
   }
   val mapTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-  val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { if (satelliteMode) { satelliteMode = false; mapPrefs.edit().putBoolean("satellite", false).apply(); map.setTileSource(streetTiles); map.tileProvider.clearTileCache(); map.invalidate() }; status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
-  val satellite = Button(this).apply { text = "🛰 Satélite"; setOnClickListener { if (!satelliteMode) { satelliteMode = true; mapPrefs.edit().putBoolean("satellite", true).apply(); map.setTileSource(satelliteTiles); map.tileProvider.clearTileCache(); map.invalidate() }; status.text = "Imágenes satelitales Esri · No son imágenes en tiempo real." } }
+  val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { if (satelliteMode) { satelliteMode = false; mapPrefs.edit().putBoolean("satellite", false).apply(); map.setTileSource(streetTiles); map.maxZoomLevel = 19.0; map.postInvalidate() }; status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
+  val satellite = Button(this).apply { text = "🛰 Satélite"; setOnClickListener { if (!satelliteMode) { satelliteMode = true; mapPrefs.edit().putBoolean("satellite", true).apply(); map.setTileSource(satelliteTiles); map.maxZoomLevel = 18.0; if (map.zoomLevelDouble > 18.0) map.controller.setZoom(18.0); map.postInvalidate() }; status.text = "Imágenes satelitales Esri · No son imágenes en tiempo real." } }
   mapTools.addView(streets, LinearLayout.LayoutParams(0,-2,1f))
   mapTools.addView(satellite, LinearLayout.LayoutParams(0,-2,1f))
   root.addView(mapTools)
@@ -434,7 +434,7 @@ class MainActivity : ComponentActivity() {
   } catch(e:Exception) { content.addView(scheduleText("No se pudieron cargar los horarios.",16f,Color.RED)) }
   content.addView(scheduleText("Horarios publicados en afiches municipales. Confirma posibles cambios antes de viajar.",12f,Color.DKGRAY))
   scroll.addView(content); panel.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
-  val back=Button(this).apply { text="← Volver al mapa"; isAllCaps=false; setTextColor(Color.WHITE); background=rounded(navy,16); setOnClickListener { setContentView(rootLayout) } }
+  val back=Button(this).apply { text="← Volver al mapa"; isAllCaps=false; setTextColor(Color.WHITE); background=rounded(navy,16); setOnClickListener { setContentView(rootLayout); map.onResume(); map.postInvalidate() } }
   panel.addView(back,LinearLayout.LayoutParams(-1,dp(54)).apply { setMargins(dp(16),dp(6),dp(16),dp(12)) })
   setContentView(panel)
  }
@@ -894,7 +894,7 @@ class MainActivity : ComponentActivity() {
      .addOnFailureListener { isEnabled = true; Toast.makeText(this@MainActivity, "No se pudo enviar. Comprueba internet y reglas.", Toast.LENGTH_LONG).show() }
    }
   }
-  val back = Button(this).apply { text = "← Volver al mapa"; setOnClickListener { setContentView(rootLayout) } }
+  val back = Button(this).apply { text = "← Volver al mapa"; setOnClickListener { setContentView(rootLayout); map.onResume(); map.postInvalidate() } }
   val bottom = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12,4,12,8) }
   bottom.addView(themes); bottom.addView(profile); bottom.addView(entry); bottom.addView(send); bottom.addView(back)
   panel.addView(title); panel.addView(notice)
