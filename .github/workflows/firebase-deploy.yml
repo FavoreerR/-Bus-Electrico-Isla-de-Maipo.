@@ -18,11 +18,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v2
+      - uses: actions/setup-node@v4
         with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-          project_id: bus-isla-de-maipo
-      - uses: google-github-actions/setup-gcloud@v2
-      - name: Deploy Firestore rules
+          node-version: '22'
+      - run: npm install --prefix functions --no-audit --no-fund
+      - name: Deploy Firestore rules with Firebase Admin SDK
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
         run: |
-          npx --yes firebase-tools@15.34.1 deploy --only firestore:rules --project bus-isla-de-maipo --non-interactive
+          node <<'NODE'
+          const fs = require('node:fs');
+          const admin = require('./functions/node_modules/firebase-admin');
+          const credentials = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '{}');
+          if (credentials.project_id !== 'bus-isla-de-maipo') {
+            throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON must belong to bus-isla-de-maipo.');
+          }
+          admin.initializeApp({
+            credential: admin.credential.cert(credentials),
+            projectId: 'bus-isla-de-maipo'
+          });
+          admin.securityRules()
+            .releaseFirestoreRulesetFromSource(fs.readFileSync('firestore.rules', 'utf8'))
+            .then(() => console.log('Firestore rules deployed successfully.'))
+            .catch(error => {
+              console.error('Firestore rules deployment failed:', error.message);
+              process.exitCode = 1;
+            });
+          NODE
