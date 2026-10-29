@@ -134,11 +134,11 @@ class MainActivity : ComponentActivity() {
    setUseDataConnection(true)
    setFlingEnabled(true)
    minZoomLevel = 5.0
-   maxZoomLevel = if (satelliteMode) 18.0 else 19.0
+   maxZoomLevel = 19.0
    setHorizontalMapRepetitionEnabled(false)
    setVerticalMapRepetitionEnabled(false)
-   controller.setZoom(12.0)
-   controller.setCenter(GeoPoint(-33.70,-70.88))
+   controller.setZoom(16.5)
+   controller.setCenter(GeoPoint(-33.7535,-70.8993))
   }
   // Transparent geographic labels over satellite imagery: hybrid mode.
   val labelTiles = object : XYTileSource("EsriReferenceLabels", 0, 19, 256, ".png",
@@ -152,7 +152,7 @@ class MainActivity : ComponentActivity() {
   map.overlays.add(labelsOverlay)
   val mapTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
   val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { if (satelliteMode) { satelliteMode = false; mapPrefs.edit().putBoolean("satellite", false).apply(); map.setTileSource(streetTiles); labelsOverlay.isEnabled = false; map.maxZoomLevel = 19.0; map.postInvalidate() }; status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
-  val satellite = Button(this).apply { text = "🛰 Híbrido"; setOnClickListener { if (!satelliteMode) { satelliteMode = true; mapPrefs.edit().putBoolean("satellite", true).apply(); map.setTileSource(satelliteTiles); labelsOverlay.isEnabled = true; map.maxZoomLevel = 18.0; if (map.zoomLevelDouble > 18.0) map.controller.setZoom(18.0); map.postInvalidate() }; status.text = "Mapa híbrido: imágenes satelitales y nombres geográficos · No es tiempo real." } }
+  val satellite = Button(this).apply { text = "🛰 Híbrido"; setOnClickListener { if (!satelliteMode) { satelliteMode = true; mapPrefs.edit().putBoolean("satellite", true).apply(); map.setTileSource(satelliteTiles); labelsOverlay.isEnabled = true; map.maxZoomLevel = 19.0; map.postInvalidate() }; status.text = "Mapa híbrido: imágenes satelitales y nombres geográficos · No es tiempo real." } }
   mapTools.addView(streets, LinearLayout.LayoutParams(0,-2,1f))
   mapTools.addView(satellite, LinearLayout.LayoutParams(0,-2,1f))
   root.addView(mapTools)
