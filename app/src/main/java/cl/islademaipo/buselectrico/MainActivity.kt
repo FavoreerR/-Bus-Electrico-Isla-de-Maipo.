@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
   }
  }
  private val mapPrefs by lazy { getSharedPreferences("map_settings", MODE_PRIVATE) }
- private var satelliteMode = true
+ private var satelliteMode = false
  private lateinit var status: TextView
  private lateinit var rootLayout: LinearLayout
  private val localMessages = mutableListOf<String>()
@@ -123,9 +123,9 @@ class MainActivity : ComponentActivity() {
   applySafeInsets(root)
   rootLayout = root
   root.addView(heading)
-  status = TextView(this).apply { text = "Mapa Santiago ↔ Isla de Maipo. Ubicaciones de buses aún no conectadas."; textSize = 14f; setTextColor(Color.DKGRAY); setPadding(18,18,18,18) }
+  status = TextView(this).apply { text = "📍 Isla de Maipo · Los buses mostrados son reportes de pasajeros, no GPS en vivo."; textSize = 14f; setTextColor(Color.DKGRAY); setPadding(18,18,18,18) }
   root.addView(status)
-  satelliteMode = mapPrefs.getBoolean("satellite", true)
+  satelliteMode = mapPrefs.getBoolean("satellite", false)
   map = MapView(this).apply {
    setTileSource(if (satelliteMode) satelliteTiles else streetTiles)
    setMultiTouchControls(true)
@@ -133,11 +133,11 @@ class MainActivity : ComponentActivity() {
    setTilesScaledToDpi(false)
    setUseDataConnection(true)
    setFlingEnabled(true)
-   minZoomLevel = 5.0
+   minZoomLevel = 8.0
    maxZoomLevel = 19.0
    setHorizontalMapRepetitionEnabled(false)
    setVerticalMapRepetitionEnabled(false)
-   controller.setZoom(16.5)
+   controller.setZoom(15.5)
    controller.setCenter(GeoPoint(-33.7535,-70.8993))
   }
   // Transparent geographic labels over satellite imagery: hybrid mode.
@@ -151,8 +151,8 @@ class MainActivity : ComponentActivity() {
   val labelsOverlay = TilesOverlay(labelsProvider, this).apply { isEnabled = satelliteMode }
   map.overlays.add(labelsOverlay)
   val mapTools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-  val streets = Button(this).apply { text = "🗺 Calles"; setOnClickListener { if (satelliteMode) { satelliteMode = false; mapPrefs.edit().putBoolean("satellite", false).apply(); map.setTileSource(streetTiles); labelsOverlay.isEnabled = false; map.maxZoomLevel = 19.0; map.postInvalidate() }; status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
-  val satellite = Button(this).apply { text = "🛰 Híbrido"; setOnClickListener { if (!satelliteMode) { satelliteMode = true; mapPrefs.edit().putBoolean("satellite", true).apply(); map.setTileSource(satelliteTiles); labelsOverlay.isEnabled = true; map.maxZoomLevel = 19.0; map.postInvalidate() }; status.text = "Mapa híbrido: imágenes satelitales y nombres geográficos · No es tiempo real." } }
+  val streets = Button(this).apply { text = "🗺️ Calles"; setOnClickListener { if (satelliteMode) { satelliteMode = false; mapPrefs.edit().putBoolean("satellite", false).apply(); map.setTileSource(streetTiles); labelsOverlay.isEnabled = false; map.maxZoomLevel = 19.0; map.invalidate() }; status.text = "Mapa de calles · OpenStreetMap · Reportes locales, no GPS en vivo." } }
+  val satellite = Button(this).apply { text = "🛰️ Satélite"; setOnClickListener { if (!satelliteMode) { satelliteMode = true; mapPrefs.edit().putBoolean("satellite", true).apply(); map.setTileSource(satelliteTiles); labelsOverlay.isEnabled = true; map.maxZoomLevel = 19.0; map.invalidate() }; status.text = "Mapa híbrido: imágenes satelitales y nombres geográficos · No es tiempo real." } }
   mapTools.addView(streets, LinearLayout.LayoutParams(0,-2,1f))
   mapTools.addView(satellite, LinearLayout.LayoutParams(0,-2,1f))
   root.addView(mapTools)
@@ -181,7 +181,7 @@ class MainActivity : ComponentActivity() {
   buttons.addView(actionCard("✉", "RECLAMOS Y SUGERENCIAS", "Ayúdanos a mejorar la aplicación", Color.rgb(18,116,144), Color.WHITE) { showFeedbackForm() })
   buttons.addView(actionCard("🛡", "ADMINISTRACIÓN", "Acceso privado del creador", Color.rgb(30,41,59), Color.WHITE) { showAdminLogin() })
   val buttonScroll = ScrollView(this).apply { isFillViewport = false; addView(buttons); setBackgroundColor(Color.rgb(247,249,253)) }
-  root.addView(buttonScroll, LinearLayout.LayoutParams(-1, dp(340)))
+  root.addView(buttonScroll, LinearLayout.LayoutParams(-1, dp(260)))
   setContentView(root)
   root.post { ensurePassengerProfile(); showFirstRunGuide() }
  }
@@ -534,7 +534,7 @@ class MainActivity : ComponentActivity() {
   } catch(e:Exception) { content.addView(scheduleText("No se pudieron cargar los horarios.",16f,Color.RED)) }
   content.addView(scheduleText("Horarios publicados en afiches municipales. Confirma posibles cambios antes de viajar.",12f,Color.DKGRAY))
   scroll.addView(content); panel.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
-  val back=Button(this).apply { text="← Volver al mapa"; isAllCaps=false; setTextColor(Color.WHITE); background=rounded(navy,16); setOnClickListener { setContentView(rootLayout); map.onResume(); map.postInvalidate() } }
+  val back=Button(this).apply { text="← Volver al mapa"; isAllCaps=false; setTextColor(Color.WHITE); background=rounded(navy,16); setOnClickListener { setContentView(rootLayout); map.onResume(); map.invalidate() } }
   panel.addView(back,LinearLayout.LayoutParams(-1,dp(54)).apply { setMargins(dp(16),dp(6),dp(16),dp(12)) })
   setContentView(panel)
  }
@@ -1156,7 +1156,7 @@ class MainActivity : ComponentActivity() {
      .addOnFailureListener { isEnabled = true; Toast.makeText(this@MainActivity, "No se pudo enviar. Comprueba internet y reglas.", Toast.LENGTH_LONG).show() }
    }
   }
-  val back = Button(this).apply { text = "← Volver al mapa"; setOnClickListener { setContentView(rootLayout); map.onResume(); map.postInvalidate() } }
+  val back = Button(this).apply { text = "← Volver al mapa"; setOnClickListener { setContentView(rootLayout); map.onResume(); map.invalidate() } }
   val bottom = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12,4,12,8) }
   bottom.addView(themes); bottom.addView(profile); bottom.addView(entry); bottom.addView(send); bottom.addView(back)
   panel.addView(title); panel.addView(notice)
