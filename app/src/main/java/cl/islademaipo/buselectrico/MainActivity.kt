@@ -629,17 +629,17 @@ class MainActivity : ComponentActivity() {
   val routePicker = android.widget.Spinner(this)
   windowPicker.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, windows)
   routePicker.adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, routeOptions)
-  val results = TextView(this).apply {
-   text = "Cargando reportes..."
-   textSize = 15f
-   setTextColor(Color.rgb(30,41,59))
-   setPadding(0, dp(15), 0, dp(10))
-  }
+  val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(12), 0, dp(8)) }
+  val summary = TextView(this).apply { text = "Cargando reportes..."; textSize = 15f; setTextColor(Color.rgb(9,83,166)); setTypeface(null, android.graphics.Typeface.BOLD) }
+  explanation.setTextColor(Color.WHITE)
+  explanation.setPadding(dp(14),dp(12),dp(14),dp(12))
+  explanation.background = rounded(Color.rgb(9,83,166), 16)
   container.addView(explanation)
   container.addView(TextView(this).apply { text = "PERÍODO"; setTypeface(null, android.graphics.Typeface.BOLD) })
   container.addView(windowPicker)
   container.addView(TextView(this).apply { text = "RECORRIDO"; setTypeface(null, android.graphics.Typeface.BOLD); setPadding(0,dp(12),0,0) })
   container.addView(routePicker)
+  container.addView(summary)
   val scroller = ScrollView(this).apply { addView(results) }
   container.addView(scroller, LinearLayout.LayoutParams(-1, dp(330)))
   val dialog = android.app.AlertDialog.Builder(this)
@@ -649,7 +649,8 @@ class MainActivity : ComponentActivity() {
    .setPositiveButton("Actualizar", null)
    .create()
   fun load() {
-   results.text = "Consultando avistamientos..."
+   summary.text = "Consultando avistamientos..."
+   results.removeAllViews()
    val now = System.currentTimeMillis()
    val calendar = java.util.Calendar.getInstance().apply {
     set(java.util.Calendar.HOUR_OF_DAY, 0)
@@ -678,15 +679,46 @@ class MainActivity : ComponentActivity() {
        2 -> "Salió del paradero"
        else -> "Avistamiento"
       }
-      val clock = java.text.SimpleDateFormat("HH:mm", java.util.Locale("es", "CL")).format(java.util.Date(t))
-      "🚌 $clock  ·  $r\\n     $direction · $event"
+      Triple(t, r, Pair(direction, event))
      }
-     results.text = if (rows.isEmpty()) "No hay avistamientos en este período para el recorrido seleccionado."
-      else "${rows.size} avistamiento(s) encontrados\\n\\n" + rows.joinToString("\\n\\n") +
-       if (snapshot.size() >= 500) "\\n\\nSe muestran los 500 reportes más recientes del día como máximo." else ""
+     summary.text = "${rows.size} avistamiento(s) encontrados"
+     results.removeAllViews()
+     if (rows.isEmpty()) results.addView(TextView(this).apply {
+      text = "No hay avistamientos para este período y recorrido."
+      textSize = 15f; setTextColor(Color.DKGRAY); setPadding(0, dp(20), 0, dp(20))
+     })
+     rows.forEach { (timestamp, routeName, details) ->
+      val clock = java.text.SimpleDateFormat("HH:mm", java.util.Locale("es", "CL")).format(java.util.Date(timestamp))
+      val card = LinearLayout(this).apply {
+       orientation = LinearLayout.VERTICAL
+       setPadding(dp(14), dp(12), dp(14), dp(12))
+       background = rounded(Color.rgb(235,244,255), 16)
+      }
+      card.addView(TextView(this).apply {
+       text = "🕒  $clock  ·  Hoy"; textSize = 19f; setTextColor(Color.rgb(9,83,166))
+       setTypeface(null, android.graphics.Typeface.BOLD)
+      })
+      card.addView(TextView(this).apply {
+       text = "🚌  $routeName"; textSize = 16f; setTextColor(Color.rgb(24,43,73))
+       setTypeface(null, android.graphics.Typeface.BOLD); setPadding(0, dp(8), 0, 0)
+      })
+      card.addView(TextView(this).apply {
+       text = "➜  ${details.first}"; textSize = 14f; setTextColor(Color.rgb(9,83,166))
+       setPadding(0, dp(6), 0, 0)
+      })
+      card.addView(TextView(this).apply {
+       text = "📍  ${details.second}"; textSize = 14f; setTextColor(Color.DKGRAY)
+       setPadding(0, dp(6), 0, 0)
+      })
+      results.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+     }
+     if (snapshot.size() >= 500) results.addView(TextView(this).apply {
+      text = "Se consultaron como máximo los 500 reportes más recientes del día."
+      textSize = 12f; setTextColor(Color.DKGRAY)
+     })
     }
     .addOnFailureListener {
-     if (dialog.isShowing) results.text = "No se pudo consultar el historial. Comprueba la conexión y los permisos de lectura de Firebase."
+     if (dialog.isShowing) { summary.text = "Error al consultar"; results.removeAllViews(); results.addView(TextView(this).apply { text = "Comprueba la conexión y los permisos de Firebase." }) }
     }
   }
   val change = object : android.widget.AdapterView.OnItemSelectedListener {
