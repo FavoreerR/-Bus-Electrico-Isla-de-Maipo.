@@ -4,8 +4,7 @@ on:
   push:
     branches: [main]
 permissions:
-  contents: read
-  id-token: write
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,18 +17,30 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      # Opcional: activar cuando existan ambas variables de repositorio.
-      # GCP_WORKLOAD_IDENTITY_PROVIDER: ruta completa del proveedor.
-      # GCP_SERVICE_ACCOUNT: correo de la cuenta de servicio autorizada.
-      - name: Autenticar con Google Cloud mediante OIDC
-        if: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT != '' }}
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
       - name: Build APK
         run: gradle :app:assembleDebug --no-daemon
+      - name: Prepare public release APK
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/BusElectrico-IslaDeMaipo.apk
+          sha256sum dist/BusElectrico-IslaDeMaipo.apk > dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: BusElectrico-IslaDeMaipo-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: dist/*
+      - name: Publish public GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: bus-v1.0.${{ github.run_number }}
+          name: Bus Eléctrico Isla de Maipo v1.0.${{ github.run_number }}
+          body: |
+            APK Android para pasajeros.
+
+            Descarga: `BusElectrico-IslaDeMaipo.apk`
+            SHA-256: `SHA256SUMS.txt`
+          files: |
+            dist/BusElectrico-IslaDeMaipo.apk
+            dist/SHA256SUMS.txt
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
