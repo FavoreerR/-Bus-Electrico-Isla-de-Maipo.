@@ -75,6 +75,18 @@ class MainActivity : ComponentActivity() {
  private val localMessages = mutableListOf<String>()
  private val chatPrefs by lazy { getSharedPreferences("passenger_chat_local", MODE_PRIVATE) }
  private val sightings = mutableListOf<Pair<GeoPoint, Long>>()
+ private val sightingLifetimeMs = 60_000L
+ private val sightingExpiryHandler = android.os.Handler(android.os.Looper.getMainLooper())
+ private val sightingExpiryRunnable = object : Runnable {
+  override fun run() {
+   if (::map.isInitialized) {
+    val now = System.currentTimeMillis()
+    map.overlays.removeAll { it is Marker && it.title?.startsWith("🚌 Reporte de pasajero:") == true && (it.relatedObject as? Long)?.let { timestamp -> now - timestamp >= sightingLifetimeMs } == true }
+    map.invalidate()
+   }
+   sightingExpiryHandler.postDelayed(this, 1_000L)
+  }
+ }
  private val reportPrefs by lazy { getSharedPreferences("sighting_reports", MODE_PRIVATE) }
  private var myMarker: Marker? = null
  private var retryReportAfterPermission = false
@@ -96,6 +108,7 @@ class MainActivity : ComponentActivity() {
  override fun onCreate(savedInstanceState: Bundle?) {
   super.onCreate(savedInstanceState)
   setupNotifications()
+  sightingExpiryHandler.post(sightingExpiryRunnable)
   Configuration.getInstance().userAgentValue = "BusElectricoIslaDeMaipo/1.2 (Android; $packageName)"
   Configuration.getInstance().osmdroidBasePath = File(filesDir, "osmdroid").apply { mkdirs() }
   Configuration.getInstance().osmdroidTileCache = File(filesDir, "osmdroid/tiles").apply { mkdirs() }
@@ -503,7 +516,7 @@ class MainActivity : ComponentActivity() {
      val direction = doc.getString("direction") ?: "Dirección no indicada"
      if (lat != null && lon != null && time != null && option != null &&
          lat in -90.0..90.0 && lon in -180.0..180.0 &&
-         time <= now && now - time < 7200000L && option in 0..2) {
+         time <= now && now - time < sightingLifetimeMs && option in 0..2) {
       addSightingMarker(GeoPoint(lat, lon), time, "$route · $direction · ${arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")[option]}")
      }
     }
@@ -685,6 +698,7 @@ class MainActivity : ComponentActivity() {
    position = point
    icon = sectorBusIcon(description.substringBefore(" · "))
    title = "🚌 Reporte de pasajero: $description"
+   relatedObject = time
    snippet = "$clock · Ubicación aproximada · Reportado por pasajeros, no GPS en vivo"
    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
    map.overlays.add(this)
@@ -702,7 +716,7 @@ class MainActivity : ComponentActivity() {
     val option = parts[3].toIntOrNull()
     if (lat != null && lon != null && time != null && option != null &&
         lat in -90.0..90.0 && lon in -180.0..180.0 &&
-        time <= now && now - time < 2 * 60 * 60 * 1000L && option in 0..2) {
+        time <= now && now - time < sightingLifetimeMs && option in 0..2) {
      addSightingMarker(GeoPoint(lat, lon), time, arrayOf("Bus pasando", "Bus detenido", "Bus salió del paradero")[option])
     }
    }
@@ -919,7 +933,7 @@ class MainActivity : ComponentActivity() {
  private fun showMyLocation() { if (ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED && ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED) return
   locationClient.lastLocation.addOnSuccessListener { loc -> if (loc!=null) { myMarker?.let { map.overlays.remove(it) }; myMarker=Marker(map).apply { position=GeoPoint(loc.latitude,loc.longitude); title="Tu ubicación (solo en este teléfono)"; map.overlays.add(this) }; map.controller.setZoom(14.0); map.controller.setCenter(GeoPoint(loc.latitude,loc.longitude)); map.invalidate(); status.text="Tu ubicación se muestra solo en este dispositivo. No se envía a ningún servidor." } else status.text="No se pudo obtener la ubicación. Activa GPS e inténtalo nuevamente." }
  }
- override fun onDestroy(){ stopGpsSharing(); gpsListener?.remove(); chatListener?.remove(); sightingListener?.remove(); if(::map.isInitialized) map.onDetach(); super.onDestroy() }
+ override fun onDestroy(){ sightingExpiryHandler.removeCallbacks(sightingExpiryRunnable); stopGpsSharing(); gpsListener?.remove(); chatListener?.remove(); sightingListener?.remove(); if(::map.isInitialized) map.onDetach(); super.onDestroy() }
  override fun onResume(){super.onResume();if(::map.isInitialized)map.onResume()}
  override fun onPause(){if(gpsSharing) stopGpsSharing();if(::map.isInitialized)map.onPause();super.onPause()}
 }
